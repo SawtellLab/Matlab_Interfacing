@@ -1,5 +1,7 @@
 function expt = ImportExpt_Spike7(exptdir,exptfoldername)
 
+%requires github.com/SawtellLab/Matlab_Functions to be in Matlab path
+
 % exptdir = 'Z:\KP\WorkingFolder\';
 % exptfoldername = [exptfoldername '\'];
 
