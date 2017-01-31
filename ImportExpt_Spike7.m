@@ -10,10 +10,8 @@ ch_CmdMarker = '_Ch8';
 % exptdir = 'Z:\KP\WorkingFolder\';
 % exptfoldername = [exptfoldername '\'];
 
-exptdir = '/Users/kperks/mnt/sawtellnas/WorkingFolder/';
-exptfoldername = [exptfoldername '/'];
+% exptdir = '/Users/kperks/mnt/sawtellnas/WorkingFolder/';
 
-expt.name = exptfoldername;
 cd([exptdir exptfoldername])
 
 expt.newRate = 10000;
@@ -43,13 +41,13 @@ clear tmp
 
 %Ch2 Command signal
 %load and process command marker channel created manually in spike
-varname = ['V' exptfoldername(1:end-1) ch_CmdMarker];
-exptfilename = [varname '.mat'];
-m = matfile(exptfilename);
-s = ['tmp = m.' varname ';'];
-eval(s);
-expt.CmdMarker = tmp.times;
-clear tmp
+%varname = ['V' exptfoldername(1:end-1) ch_CmdMarker];
+%exptfilename = [varname '.mat'];
+%m = matfile(exptfilename);
+%s = ['tmp = m.' varname ';'];
+%eval(s);
+%expt.CmdMarker = tmp.times;
+%clear tmp
 
 savename = [exptfoldername(1:end-1) '.mat'];
 save(savename,'expt')
