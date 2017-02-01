@@ -5,7 +5,7 @@ function expt = ImportExpt_Spike7(exptdir,exptfoldername)
 %in future, make this input a varargin to take in the specific channel:fieldnames pairing for the expt structure
 ch_LowGainSignal = '_Ch4';
 ch_CmdSignal = '_Ch2';
-ch_CmdMarker = '_Ch8';
+ch_CurrentSignal = '_Ch5';
 
 % exptdir = 'Z:\KP\WorkingFolder\';
 % exptfoldername = [exptfoldername '\'];
@@ -37,6 +37,16 @@ s = ['tmp = m.' varname ';'];
 eval(s);
 [out,dt] = dnsample_data(tmp.values,expt.newRate,expt.oldRate);
 expt.Cmd = out;
+clear tmp
+
+%load and process Input Current Command channel (continuously tracks holding current)
+varname = ['V' exptfoldername(1:end-1) ch_CurrentSignal];
+exptfilename = [varname '.mat'];
+m = matfile(exptfilename);
+s = ['tmp = m.' varname ';'];
+eval(s);
+[out,dt] = dnsample_data(tmp.values,expt.newRate,expt.oldRate);
+expt.I = out;
 clear tmp
 
 %Ch2 Command signal
