@@ -1,0 +1,19 @@
+function SweepsMat = MakeSweeps(ContinuousData,TriggerData,sweeps_samps)
+
+%structures the data into sweeps initiated by each trigger of equal length
+%stores info like time until next trigger so can, for example filter EOD sweeps
+%separated by a minimum duration etc... 
+
+
+data = lowgain.values';
+datamat = zeros(size(sweeps_trig,1),sweeps_samps);
+for isweeps = 1:size(sweeps_trig,1)
+    ind = round(sweeps_trig(isweeps)/tmp_c.interval);
+    if (ind+sweeps_samps-1) <= size(data,2);
+    datamat(isweeps,:) = data(ind:ind+sweeps_samps-1);
+    end
+end
+[out,dt] = dnsample_data(datamat,expt.wc.oldRate,expt.wc.newRate);
+expt.wc.dt = dt;
+expt.wc.Vm = out;
+clear tmp_c 

@@ -1,0 +1,7 @@
+var v12% := ViewFind("20170509_012.smr");
+FrontView(v12%);
+Draw(708.029, 1305.73);
+ExportChanList(1); 'Initialise the channel list
+ExportChanList(393.204, 2001.08, 20,5,4,2,9,11,1,31);
+FileSaveAs("C:\\Users\\kperks\\spikedata\\matdata\\20170509_012\\20170509_012_SPK.mat",100,0,"",0,
+"UseSName=0|UseCName=1|WaveTimes=0|BinFreq=20000|BinTimes=1|WaveData=2|MarkAs=1|TMarkAs=2|RMarkAs=2|RMarkData=2|WaveMarkAs=2|WaveMarkData=2|Compat=0"); 'Export (string args)
