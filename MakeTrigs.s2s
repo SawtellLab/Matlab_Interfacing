@@ -1,0 +1,36 @@
+
+CursorNew(XLow()*0.25+XHigh()*0.75, 9);
+CursorLabel(3,9);
+
+HCursorLabel(3,2);
+
+HCursorLabel(3,1);
+
+var charttmp%; 'MemChan created channel
+var chcmd%; 'MemChan created channel
+
+
+chcmd% := MemChan(3); 'Add new Event+ channel
+ChanShow(chcmd%); 'Make it visible
+MemImport(chcmd%, 2, 0, MaxTime(),3,0.004,HCursor(1));
+ChanTitle$(chcmd%, "cmdtmp");
+
+
+charttmp% := MemChan(3); 'Add new Event+ channel
+ChanShow(charttmp%); 'Make it visible
+MemImport(charttmp%, 2, 0, MaxTime(),3,0.004,HCursor(2));
+ChanTitle$(charttmp%, "ArtTrig");
+
+var chArtTrig%; 'MemChan created channel
+chArtTrig% := ChanNew(0,3); 'Add new Event+ channel
+PrintLog(chArtTrig%);
+MemSave(charttmp%,chArtTrig%,3, 1);
+
+ChanShow(chArtTrig%); 'Make sure destination is visible
+ChanShow(5); 'make sure current channel is showing
+
+var chspikes%; 'MemChan created channel
+chspikes% := MemChan(3); 'Add new Event+ channel
+ChanShow(chspikes%); 'Make it visible
+MemImport(chspikes%, 4, 0.0, MaxTime(),0,0.001,5);
+ChanTitle$(chspikes%, "spkstmp");

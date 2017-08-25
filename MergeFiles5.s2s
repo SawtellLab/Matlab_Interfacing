@@ -1,0 +1,1782 @@
+'$MergeFiles5.s2s|Copy/Paste data between time views or splice them (Spike2 v5)
+'===========================================================================================================
+'CAMBRIDGE ELECTRONIC DESIGN LIMITED, THE SCIENCE PARK, MILTON RD., CAMBRIDGE CB6 0FE, UK
+'===========================================================================================================
+
+'Copyright © Cambridge Electronic Design 2008
+'last modified: June 2009.
+'Author: GH.
+
+'SOFTWARE REQUIRED:
+'Spike 2 version 5.21
+'This script is a stripped-down version of the <FileMerge.s2s> script that works in  Spike2 v5.
+'Users of Spike2 v6.06 or higher should use the "de-luxe" version in the <scripts> folder of Spike2 v6 and v7.
+
+'HEALTH WARNING:
+'The script is a <work in progress> and is offered without guarantees.
+'Make backup copies of your data before running this script.
+
+'KEYWORDS
+'Concatenate, splice,  merge, copy, paste, time views, files, channels, batch process 
+
+'USER GUIDE
+'This script allows you to:
+'a) Merge all the time views in a selected folder into a single data file
+'b) Copy and paste data between open time views.
+'c) Delete data from selected time ranges in a time view
+
+'---------------------------------------------------------------------------------------------------------------------------
+'a) Merge all the time views in a selected folder into a single data file             
+'---------------------------------------------------------------------------------------------------------------------------
+'Using this feature you can create a new file containing the data from a batch of source files linked end to end in order of creation date.
+'Alternatively, you can add data from a batch of source files into new channels in the destination file so that the data are overlaid on the same
+'time range. This process is primarily intended for merging files that were recorded with the same sampling configuration.
+'The script will alert you if you try to combine files that are not fully compatible. You will have the opportunity to <Cancel> or <Continue>.
+'If you proceed, the script will use cubic splining to make the best possible job of representing all the data given the time resolution
+'and sampling rates set by the first file in the batch. Details of which channels were copied where are stored in TextMarks in a channel
+'entitled <mergeinfo>.
+
+'Batch Processing:
+'Click the Batch Process button on the script toolbar
+'Browse to the folder containing the batch of data files to process by double clicking on the folder icons in the <Select folder> contol panel
+'and click on OK.
+'The Set up batch dialog will open. This dialog has the following items:
+
+'MODE: There are 3 options.
+'<New channels> adds each data channel in a source file to a new channel in the destination, that is, superimposed upon a common x-axis.
+'<Match channel nr> links the contents of matching channel numbers in the source files end-to-end in creation date order.
+'<Match channel title> concatenates channels with the same title together chronologically. If more than one channel with the same title
+'is encountered during processing, data will be added to the lowest numbered channel with matching title and compatible data type.
+'Thus, the system will cope with a waveform and an event channel both entitled <Activity>  but not two waveforms or an event and a realmark
+'with the same name.
+
+'CHANNELS TO COPY: Choose an option from the drop-down list, that is <All> or <Visible> or enter a channel specification (e.g. 1..4,6) to
+'define a subset of channels to process. If you choose the <Visible> option then you should review all the files before processing to
+'ensure that the Show/Hide state of the channels is what you require.
+
+'GAP BETWEEN SECTIONS: This item is enabled when adding data sections end to end. It allows you to set a short gap between data sections
+'with different sources. You can set the gap to zero to simulate continuous data.
+
+'ERROR CHECKING
+'Various problems may arise during the processing of a batch of data. For example, the data type of a channel in the current source file
+'may not be compatible with the type of the requested destination.
+'The checkbox item determines how such problems are handled.
+'If the box is unchecked then data which cannot be copied to the requested destination for some reason will automatically be copied to
+'a new channel in the destination. A warning message will display for a few seconds before copying resumes.
+'However, if the checkbox is checked, then you will get the option to Abort or Continue if a problem is encountered.
+
+'Click on <OK> to start batch processing.
+
+'The first step is to sort the source files into date order based on the time that sampling started. This version of the script
+'is not intended for use with files that lack a valid creation date (e.g. Files created using Spike2 v.4.02 or earlier).
+'If you are using Spike2 version 6 then you can add creation dates to files that lack them by re-instating the block of code
+'between dashed lines in the <BatchProcess%()> function below. Better still, use the <MergeFiles> script in the <scripts> folder
+'inside Spike6 directory. 
+
+'Next the files are checked to make sure there are enough free channels and sufficient time available in the destination file to merge the data.
+'The maximum allowed duration is set by the time resolution of the first (that is, the oldest) file in the batch.
+'If a problem is detected you will have the option to copy as many files as possible or to cancel the process.
+
+'The progess of the batch process will be shown on the toolbar and a list of files that were copied (and NOT copied) will be shown in
+'the log window when the process finishes. The new merged data file will be shown on the desktop. Use the <Save As> command on the 
+'Spike2 File menu to save it to disk with a name of your choice.
+
+'---------------------------------------------------------------------------------------------------------------------------
+'b) Copy and paste data between open time views.                                       
+'---------------------------------------------------------------------------------------------------------------------------
+'Click on the Copy/Paste button to display the Copy/Paste dialog. The button will be disabled if no time views are open.
+'Like the batch processing option this function is primarily intended for copying and pasting data between channels and files
+'that are fully compatible in terms of time resoplution and sampling rates. If the source data does not match the destination 
+'in these respects, then the script will represent data as best it can by cubic splining data to match it to the time resolution of 
+'the first file added to the destination file.
+
+'The Copy/Paste option does allow more flexibility than the batch processing option in that you can select
+'a group of channels in a time range in the source file and paste them in at a specified time in the destination channel, overwriting
+'pre-existing data if necessary. If you wish to combine data with significantly different sampling rates, it is advisable to copy the
+'data with the highest sampling rates first.
+
+'The copy/paste option is controlled by a dialog with following items:
+
+'SOURCE:
+'VIEW:	Select the view containing the data you wish to copy from a list of open time views
+'CHANNELS TO COPY:	Type in a channel specification, such as 1,2,5..12 or choose an option from the drop-down list (All/Visible/Selected)
+'START TIME/END TIME:	Select the start and end time of the section to copy. You can do this by typing times into the selection boxes,clicking
+'on the spinner controls or by fetching and dragging the start and end cursors in the source view. Clicking on the checkboxes, next to the time items
+'will toggle the times (and cursor positions) between the current display range  and the start and end of the file.
+'The duration of the chosen data section is shown at the bottom of the <Source> group.
+
+'DESTINATION:
+'VIEW:	Select the destination file where the results should be pasted. This can be an open time view or a New time view.
+'Note that the source and destination must be different files.
+
+'CHANNELS: Here you can select the channels to which the source data should be added. The options are: New channels, channels with matching 
+'channel numbers or channels with matching channel titles. When copying to existing channels, the script will check whether the source is compatible
+'with the destination and warn you if there is a problem. The rules for copying between channels of different types are as described in the
+'Spike 2 Help for the ChanSave() script command which is the function which does most of the heavy lifting performed by this script.
+'It is important to realise that the time resolution of the destination file will apply to any additional data that you paste in. The source data
+'will be matched to the resolution of the destination file by cubic splining and this will result in a loss of "definition" in the DESTINATION
+'if the source data has a higher resolution than the destination.
+
+'INSERT AT TIME:	 You can type in a time or select MaxTime(), Cursor(1) or zero from the drop-down list. You are not obliged to paste the 
+'first data section in at time zero in the destination. You can paste it in at a time of your choosing and fill in the leading space later with
+'data from other files. In this way, you can set the time resolution of the destination file to that of the first source file without
+'prejudicing the final order of appearance of data sections.
+
+'You are free to drag the cursor in the destination file to the required position at any time prior to clicking on OK in the dialog.
+'Alternatively, you can set the start time for pasting data to the position of an event or marker in a channel in the destination file.
+'If Cursor(1) is selected in the dialog, the <Align Cursor> button will be visible. Click on it to open a dialog that enables you to 
+'move the cursor from its current position to the next or previous event on a selected channel.
+
+'If you select a time other than MaxTime(), it is possible that existing markers or waveforms will be overwritten. You will be warned if this is about
+'to happen so that you can cancel the operation if you have second thoughts. Note that all Markers/Events in a time range are deleted before any new
+'ones are added.
+
+'FREE CHANNELS: When creating a new time view, you can edit this item to specify the number of channels to create in the new file. When copying
+'to an existing file, this item indicates how many unused channels are available for adding new data.
+
+'GAP BETWEEN SECTIONS:	When adding data sections end to end, you can set a short gap between data sections in order to distinguish them clearly
+'from preceding and following data. You can set the gap to zero to simulate continuous data.
+
+'MAX. DURATION:	this is the maximum allowed length of the current destination file shown in seconds and in hr:min:sec format.
+'This upper limit is determined by the time resolution of the destination file. When you create a new destination file, it will have the same 
+'time resolution as the first source file that you add.
+'TIME REMAINING:	this is the amount of time available in the destination file for concatenating new data sections.
+
+'Click on the OK button to perform the copy/paste operation or press CANCEL to return to the Toolbar.
+'If the OK button is disabled, try pressing the <tab> key. If the OK button remains disabled, it means that one or more of the items in the
+'dialog has not been filled in correctly.
+
+'When you click on OK, further error-checking is performed and any problems found will be reported in a warning message so that you can modify
+'the dialog settings accordingly. 
+
+'Copying the data may take a significant amount of time if you are copying large chunks of data.
+'Please wait while the <Copying channel...> prompt is showing on the toolbar.
+'If you are copying to a new file you will be prompted to enter a name for the New file before it is created.
+
+'As in batch processing, TextMarks in the channel entitled <Mergeinfo> store information about the source of the data that was pasted into 
+'the destination file.
+
+'You can close data files that you have finished processing by clicking on their <Close> boxes and open new views to process via the Spike2
+'file menu. However, note that these options are not available while the Copy/Paste dialog is open.
+
+'---------------------------------------------------------------------------------------------------------------------------
+'b) Delete unwanted sections of data in a time view                                       
+'---------------------------------------------------------------------------------------------------------------------------
+'Example applications might be to delete artifacts or to create files containing <edited highlights> of your recordings for further analysis.
+'You can delete data from individual or multiple channels. Waveforms can be replaced with a baseline at zero or a gap in the data.
+'The gap can be of the same duration as the data section that you delete. Alternatively, you can close the gaps to a fixed user-defined duration,
+'for example 1 second. A third option, is to eliminate the gaps altogether, linking the relevant data sections end to end with no gaps.
+'
+'USER GUIDE
+'Click the Delete button on the script toolbar. This button will be disabled unless one or more time views are oprn on the desktop.
+'The <Delete time ranges> dialog will open. This dialog has the following items:
+
+'TARGET VIEW: Select the time view that you wish to edit from the drop-down list. You cannot undo deletions made with this script. 
+'Thus it is unwise to edit the master copy of your data. Make a copy of the file with a new name using the <Copy/Paste> feature of
+'this script and edit the copy.
+
+'CHANNELS TO DELETE: Type in a channel specification such as <2> or <2,4..7> or select an option from the drop-down list.
+
+'START / END TIME: Type in the start and end time for the deletion. Alternatively, drag the <start> and <end> cursors in the time view.
+
+'Clicking the checkbox next to the times resets start and end times to the beginning and end of the file, respectively. Click on the time view
+'and click on <Ctrl+1> and <Ctrl+2> to fetch the cursors if need be.
+
+'GAP BETWEEN SECTIONS: This items determines how the data will be displayed after the deletion. The options are:
+'No change: data following the deletion stays in its original position.
+'No gap: the data after the deletion is shifted to the left and connected to the data preceding the deleton with no gap.
+'1s / 0.1s: These options shift the data following the deletion to the left but leave a gap of the specified duration to indicate
+'where the deletion was made. You can also type in a value of your choice for the gap duration.
+
+'OPTIONS: This item applies only to waveform and RealWave and determines whether gaps between deletions should be linked by a baseline at zero
+'or whether the sections of waveform should be left unconnected. It may be better to connect gaps with a baseline if you are planning further
+'analysis of your data using a script. This is because the action of some script commands, ChanData(), for example, will not read past a 
+'gap in the data.
+
+'NOTES: When deleting time ranges of marker channels with a marker filter applied, the script will only delete currently visible items 
+'from the time range. Hidden ones will be revealed in the gap between time ranges if you change the marker filter. This assumes, of course,
+'that the gap caused by the deletion was not closed. If you close up the gap created by a deletion, then hidden markers in the region 
+'of overlap are also deleted.
+
+'GLOBAL VARIABLES AND CONSTANTS
+const on%:=1,off%:=0;
+const quitbtn%:=1, delbtn%:=3,TVSplicebtn%:=5, batchbtn%:=7;
+var gFloat%[20];	                                     'App() view handles
+var tflash;	                                           'timer used by NewsFlash
+var lastC[11];	                                        'last position of each cursor ([0] unused)
+var vlst%[100];	                                     'array of open time views. Surely size of 100 is more than enough?
+var specarr%[401];	                                  'array of channels derived from a channel specification string
+var destarr%[401];
+var nvws%;	                                           'number of views found
+var t;	                                              'stores maxtime of the current view
+var lastsel%;	                                        'count of selected channels in source view
+var lastselsum%;	                                     'last sum of selected channels
+var lastvis%;	                                        'count of selected channels in source view
+var lastvissum%;	                                     'last sum of visible channels
+var lastn%;	                                           'number of copy-able channels in source view
+var newflag%;	                                        'flag copying to a new destination file
+var itm%[3];	                                        'dialog item numbers
+var srcndx%,destndx%;	                               'index of source and destination view handles in vlst%[]
+var destoption%;	                                     'new|match chan nr.| match chan title
+var ditm%[7];	                                        'dialog item numbers
+var chspec$;	                                        'channel specification to copy/paste
+var stdest$;	                                        'dialog entry for  start time for pasting data in destination file
+var en%[5];	                                           'all elements must be set to 1 for the OK button in TVSplice dialog to enable
+var TMax;	                                           'Max duration of destination file
+var lasttdur;	                                        'monitors duration of data to be copied
+var hr%,mins%,sec%;	                                  'convert time in sec to clock format
+var maxTmax;	                                        'duration of longest fil;e in batch
+var stopflag%;	                                        '1: flag stop if chans incompatible; 0: copy to new channel
+var spacer$;	                                        'variable offset for sequences of toolbar text prompts
+
+'MAIN
+HideApps();
+DoToolbar();
+RestoreApps();
+halt
+
+'FUNCTIONS AND PROCEDURES
+func AddMergeInfo%(tmkch%,srcvh%,t,st,nd,cspc$,mode%)	 'add a text mark with details of channels and time ranges pasted
+'tmkch%: textmark buffer in the current (destination) view
+'srcvh%: handle of an open time view from which channel data was copied
+'t: required position for the textmark
+'st,nd: start and end of time range that was copied
+'cspc$: source channel specification
+'mode%: 0/1/2: New channels/match channel number/match channel title
+var ttl$,ln%,code%[4],tmk$,created$,ok%,vh%;
+var destspc$;
+
+vh%:=View();	                                        'remember current (destination) view handle
+View(srcvh%);	                                        'switch to source
+ttl$:=WindowTitle$();	                               'compile the info to show in the textmark
+created$:=FileDate$(4,4,1,0,"/")+". "+FileTime$(1,15,0,":");
+ln%:=Len(ttl$);
+ttl$:=Left$(ttl$,ln%-4);	                            'extract the file name
+if mode%>0 then
+	tmk$:=Print$("%s(%s) ch: %s. Range: %.2f - %.2fs.",ttl$,created$,cspc$,st,nd);	'concatenating
+else
+	destspc$:=Makecspc$(destarr%[]);	                   'create channel specification from destination array
+	tmk$:=Print$("%s(%s) source ch: %s. dest ch: %s",ttl$,created$,cspc$,destspc$);	'adding new channels
+endif;
+View(vh%);	                                           'leave view as we found it
+ok%:=MemSetItem(tmkch%,0,t,code%[],tmk$);	             'add textmark
+return 1;
+end;
+
+func AlignCursorBtn%()	                               'align cursor 1 to a trigger on selected channel
+var mkrch%,dirndx%,ok%,vh%,width;
+
+vh%:=vlst%[DlgValue(5)+1];
+View(vh%);	                                           'view destination file
+if CursorExists(1)= 0 then
+	CursorSet(1);	                                     'add cursor in mid range if it doesn t exist already
+else
+	width:=XHigh()-XLow();
+	docase	                                           'Move to pre-existing cursor
+	case Cursor(1) < 0.5*width then
+		XRange(0.0,width);
+	case MaxTime()-Cursor(1) < width*0.5 then
+		XRange(MaxTime()-width,MaxTime());
+	else
+		XRange(Cursor(1)-0.5*width,Cursor(1)+0.5*width);		
+	endcase;
+endif;
+DlgCreate("Align cursor to a marker");
+DlgAllow(4);	                                        'allow cursor dragging and not much else
+DlgList(1,"Move Cursor to","Next marker|Previous marker",2);
+DlgChan(2,"on Marker channel",2+4+8+16+32+64+2048);
+ok%:=DlgShow(dirndx%,mkrch%);
+if ok% then
+	docase
+	case dirndx%= 0 and NextTime(mkrch%,Cursor(1)) < 0 then
+		Newsflash(Print$("No markers in channel %d after Cursor(1)",mkrch%),3,0,0,1);
+	case dirndx%= 1 and LastTime(mkrch%,Cursor(1)) < 0 then
+		Newsflash(Print$("No markers in channel %d before Cursor(1)",mkrch%),3,0,0,1);
+	case dirndx%= 0 and NextTime(mkrch%,Cursor(1)) > 0 then
+		Cursor(1,NextTime(mkrch%,Cursor(1)));
+	case dirndx%= 1 and LastTime(mkrch%,Cursor(1) > 0) then
+		Cursor(1,LastTime(mkrch%,Cursor(1)));		
+	endcase;
+endif;
+return 1;
+end;
+
+func ArrayfromSpec%(avh%,chspc$,specarr%[])	          'convert source channel specifier to an array of channels (specarr%[])
+'avh%:	handle of the view to which the channel specifier refers
+'chspc$	channel specifier string
+'specarr%[]	an array channel specifier that matches cspc$ is returned in this array
+'returns number of channels specified
+'NB. specifier string could be <ALL>, <Visible>, <Selected> or a channel list such as: 1,3, 5..7
+'return the number of channels in the specification
+var vislist%[401];
+var vw%;
+
+vw%:=View();	                                        'remember the current view
+chspc$:=LCase$(chspc$);
+View(avh%);	                                           'switch to the source view of the channel specification
+docase
+case InStr(chspc$,"selected")>0  then
+	ChanList(specarr%[],65536+8192+16384+2097152);	    'list of selected permanent non duplicate non-virtual channels
+case InStr(chspc$,"visible")>0 then
+	ChanList(specarr%[],2048+8192+16384+2097152);	    'list of visible permanent channels (not duplicates and virtuals)
+case InStr(chspc$,"all")>0 then
+	ChanList(specarr%[],8192+16384+2097152);	          'all except memory duplicate and virtual channels
+else	                                                 'convert specification string to an array
+	ChanList(vislist%[],2048);	                         'list of visible channels in source view
+	ChanHide(-1);	                                     'hide all
+	ChanShow(chspc$);	                                  'show just the ones we want to copy
+	ChanList(specarr%[],2048);	                         'get list of chans to copy as an array
+	ChanHide(-1);
+	ChanShow(vislist%[]);
+endcase;
+View(vw%);	                                           'restore the original view
+return specarr%[0];	                                  'return the number of channels in the spec
+end;
+
+func BatchCh%(item%)
+var en%;
+if DlgValue(1)=0 then	                               'enable /disable gap between sections
+	DlgValue(3,0.0);
+	DlgValue(4,0);
+	DlgEnable(0,3,4,itm%[:2]);
+else
+	DlgEnable(1,3,4,itm%[:2])
+endif;
+if Len(DlgValue$(2))=0 then en%:=0 else en%:=1; endif;	'disable OK btn if the channel specification is blank
+DlgEnable(en%,-1);
+return 1;
+end;
+
+func BatchFileMerge%(fname$[],dur[],nchans%,spec$,mode%,gap) 
+'fname$[]	an array of files in the current directory in chronological order to merge in a single new destination file
+'dur[]	array of corresponding file durations
+'nchans%	number of channels to create in the destination file
+'mode%	0: add data from each source file to new channels; 1: add data to matching  channel number; 2: add to channel with matching channel title.
+'bszmin,bszmax	range of BinSize() found in the files to be linked
+'gap: gap between sections (s)
+
+var sTmax, dTmax;	                                     'max duration of combined sources and destination file
+var bsz;	                                              'binsize of oldest file used to set usper time unit of destination file
+var us;	                                              'file BinSize in us.
+var n%,ok%,nch%,i%,j%,spc$,count%,ch%,t; 
+var srcvh%,destvh%;
+var mtmkch%;	                                        'textmark memory buffer
+var tofs;	                                           'time offset for textmarks when adding data to new channels
+
+count%:=Len(fname$[]);	                               'count of files to process
+srcvh%:=FileOpen(fname$[0],0,0);	                      'open the oldest
+bsz:=BinSize();	                                     'get binsize
+
+dTmax:=(Pow(2,31)-1)*bsz;	                            'get max duration (s) of dest file
+'Is there enough space to merge all of the sources?
+if mode%>0 then	                                     'concatenating channels
+	sTmax:=ArrSum(dur[]);	                            'combined duration of sources
+	if sTmax>dTmax then	                               'if no room for all sources, how many can we do?
+		ArrIntgl(dur[]);	                               'integrate source durations
+		n%:=0;
+		while dur[n%]< dTmax do
+			n%+=1;
+		wend;
+		if n%=1 then
+			Newsflash("Insufficient space available to merge the first two files",5.0,0,10,1);	'can t do any with current BinSize()
+			return 0;	                                  'flag error
+		else	                                           'tell user how many we can do
+			ok%:=MyQuery%(Print$("Insufficient space to merge all the files.\n Link as many as possible (%d out of %d) ?",n%,count%),"OK","Cancel",0,10);
+			if not ok% then
+				return 0;
+			else
+				count%:=n%;	                               'reset count of files to do and continue
+			endif;
+		endif;		
+	endif;
+else	                                                 'adding to unused channels
+	if dTmax < maxTmax then
+		ok%:=MyQuery%("One or more files is too long to be stored. Show as much data as possible?","OK","Cancel",0,10);	'
+		'this could happen if the time resolution <BinSize()> of the destination file is higher than one of the source files
+		if not ok% then
+			return 0;	                                  'cancelled 
+		endif;
+	endif;
+	if specarr%[0]* count% > nchans% then
+		count%:=nchans%/specarr%[0];	                   'reset count of files we CAN do
+		ok%:=MyQuery%(Print$("Not enough free channels to merge all the files\n. Link as many as files as possible (%d out of %d) ?",nchans%,count%),"OK","Cancel",0,10);	
+		if not ok% then
+			return 0;	                                  'cancelled 
+		endif;		
+	endif;
+endif;	
+'go ahead
+View(LogHandle());	                                  'clear the log
+EditSelectAll();
+EditClear();
+PrintLog("Files copied:\n\n");
+destvh%:=FileNew(7,0,bsz*1e6,1,1,nchans%);	          'new output file compatible with source
+mtmkch%:=MemChan(8,80);	                               'add memory channel for textmarks
+ChanTitle$(mtmkch%,"mergeinfo");
+
+ok%:=1;
+i%:=0;
+repeat
+	srcvh%:=FileOpen(fname$[i%],0,0);	                'open next source file
+	nch%:=ArrayfromSpec%(srcvh%,spec$,specarr%[]);	    'get array of channels to copy
+	spc$:=Makecspc$(specarr%[]);	                      'get channel specification in string format for the TextMark
+	ok%:=MakeDestArray%(srcvh%,specarr%[],destvh%,mode%,destarr%[],i%);	'check that channels are compatible except on first pass
+	if ok% =1 then	                                     'if no compatibility issues then do it
+		View(destvh%);
+		if mode%=0 then	                              
+			t:=0.0;	                                     'add to new chans at time zero
+		else			
+			t:=MaxTime();	                               'add at end of destination file
+			t+=gap;
+		endif;
+		for j%:=1 to specarr%[0] do
+			ToolbarText(Print$("Copying %s channel: %d",fname$[i%],specarr%[j%]));
+			View(srcvh%);	
+			ch%:=ChanSave(specarr%[j%],destarr%[j%],destvh%,0.0,MaxTime(),t);
+			destarr%[j%]:=ch%;	                         'replace zeros with actual channel number for the textmark
+			View(destvh%).ChanShow(ch%);
+		next;
+		View(destvh%);
+		XRange(t,MaxTime());
+		Optimise(-1,0,MaxTime());
+		AddMergeInfo%(mtmkch%,srcvh%,t+tofs,0.0,View(srcvh%).MaxTime(),spc$,mode%);	'add textmark to document what we have done
+		if mode%=0 then tofs+=0.1; endif;	             'offset successive textmarks when adding new channels
+		PrintLog("%s\n",fname$[i%]);	                   'build up a list of files that were copied
+		i%+=1;
+	endif;
+	View(srcvh%);
+	FileClose(0,-1);	                                  'close source file
+until ok% <> 1 or i%>=count%;	                         'until error found or all done
+ToolbarText("");
+View(destvh%);
+ch%:=ChanSave(mtmkch%,0,destvh%);	                   'save textmark channel to disk
+ChanDelete(mtmkch%);	                                  'delete memory buffer
+ChanShow(-1);	                                        'show allow
+var st;
+if MaxTime() > 100.0 then st:=MaxTime()-100.0; endif;
+XRange(st,MaxTime());	                               'show all or last 100s
+Window(0,0,100,50);
+WindowVisible(1);
+View(LogHandle());
+if i%<Len(fname$[]) then
+	PrintLog("\n\nFiles NOT copied:\n\n");	             'no room to add these files 
+	for j%:=i% to Len(fname$[])-1 do
+		PrintLog("%s\n",fname$[j%]);
+	next;
+endif;
+Window(75,50,100,100);
+WindowVisible(1);
+View(destvh%);
+return 1;
+end;
+
+func BatchProcess%()	                                  'process all <.smr> files in selected folder by creation date
+var i%,j%,ok%,nfiles%,name$,nexcluded%,mode%,gap:=1.0;
+var bszmax,bszmin,ignore%;
+var dest$[3];
+dest$[0]:="New channels"; dest$[1]:="Match channel nr."; dest$[2]:="Match channel title";
+var spec$;
+var nchans%:=256;	                                     'number of channels to create in destination file
+var dim%[12];	                                        'days in month
+const spd%:=86400;	                                  'Seconds Per Day
+var spy%;	                                           'seconds per year
+spy%:=spd%*365;
+dim%[0]:=31;dim%[1]:=28;dim%[2]:=31;dim%[3]:=30;	    'number of days in each month
+dim%[4]:=31;dim%[5]:=30; dim%[6]:=31;dim%[7]:=31;
+dim%[8]:=30;dim%[9]:=31;dim%[10]:=30;dim%[11]:=31;
+
+View(LogHandle()).WindowVisible(0);	                   'hide log
+ok%:=FilePathSet("",0,"Select folder to process");	    'select folder
+if ok%<0 then	
+	return 1;	                                        'cancelled
+endif;
+nfiles%:=FileList(name$,0);	                         'count .smr files
+if nfiles%=0 then
+	Message("No .smr files found in this folder");
+	return 1;
+endif;
+Profile("Splice","mode",0,mode%);
+Profile("Splice","spec$","All",spec$);
+DlgCreate("Set up batch process",70,10);
+DlgAllow(511,0,BatchCh%);
+DlgText("Mode",2,1);
+DlgList(1,18,dest$[],3,20,1);
+DlgString(2,"Channels to copy|Choose ALL, VISIBLE or enter a channel specification,e.g. 1,3..5,7",12 ,"0-9,.-AVbeilsv",24,2,"All|Visible| 1..3");	'channels to copy
+DlgText("Gap between sections (s)",2,3);
+DlgReal(3,7,0,1.0,31,3,0.1);
+itm%[1]:=DlgGroup("Error Checking",1,4,36.5,2.4);
+DlgCheck(4,"Stop if channels are incompatible",4,4.8);
+itm%[0]:=DlgText("Uncheck to copy to new channels",6.2,5.6);
+ok%:=DlgShow(mode%,spec$,gap,stopflag%);
+if not ok% then return 1; endif;
+
+Profile("Splice","mode",mode%);	                      'save last mode
+Profile("Splice","spec$",spec$);	                      'save last spec
+var flist$[nfiles%],td%[6][nfiles%],yr0%,sec%[nfiles%],MaxT[nfiles%],bsz[nfiles%];
+FileList(flist$[],0);	                               'get list of .smr files
+for i%:=0 to nfiles%-1 do
+	FileOpen(flist$[i%],0,0);	                         'open files in turn
+	FileTimeDate(td%[][i%]);	                         'get creation date
+	MaxT[i%]:=MaxTime();	                               'get file duration
+	bsz[i%]:=BinSize();	                               'get underlying time resolution
+	FileClose();
+next;
+bszmin:=bsz[Min(bsz[])];	                            'get lowest and highest binsize of source files
+bszmax:=bsz[Max(bsz[])];
+if bszmin<>bszmax then
+	ok%:=MyQuery%("These files were not recorded with the same sampling configuration.\n"+
+	"Data will be matched to the sampling rates of the first data file by cubic splining.","Continue","Cancel",0,10);
+	if not ok% then
+		return 1;	                                     'cancelled
+	endif;
+endif;
+maxTmax:=MaxT[Max(MaxT)];	                            'duration of longest file
+ArrSort(td%[5][],1,flist$[],td%[4][],td%[3][],td%[2][],td%[1][],td%[0][],MaxT[]);	'sort filenames in descending order of year of creation.
+'files with no creation date will sort to the end
+
+j%:=nfiles%;
+var done%:=0;
+repeat 'repeats until we find file with a valid date
+   if td%[5][j%-1]=0 then
+      nexcluded%+=1;	                                     'count files with no date
+   else
+      done%:=1;
+   endif;
+   j%-=1;
+until done% or j%=0;'until valid date or all tested
+if nexcluded%=nfiles% then
+   Message("Cannot batch process in chronological order. Files do not have creation dates.");
+   return 1;
+else
+   nfiles%-=nexcluded%;
+endif;
+
+'--------------------------------------------------------------
+'opportunity to add a creation date to undated files manually
+'if nexcluded%>0 then
+'   var itmm%;
+'   var k%,st%,nd%,lo[6],hi[6],width[6],xpos:=25,ofs:=8;
+'   var month$[13];
+'   month$[0]:="???"; month$[1]:="Jan"; month$[2]:="Feb"; month$[3]:="Mar"; month$[4]:="Apr"; 
+'   month$[5]:="May"; month$[6]:="Jun"; month$[7]:="Jul"; month$[8]:="Aug"; 
+'   month$[9]:="Sep"; month$[10]:="Oct"; month$[11]:="Nov"; month$[12]:="Dec"; 
+'   lo[0]:=0; lo[1]:=0; lo[2]:=0; lo[3]:=0; lo[4]:=1; lo[5]:=2000;	'lo and hi limits for components of date and time in dialog 
+'   hi[0]:=23; hi[1]:=59; hi[2]:=59; hi[3]:=31; hi[4]:=12; hi[5]:=2050; 
+'   width[0]:=6; width[1]:=6; width[2]:=6; width[3]:=6; width[4]:=6; width[5]:=7;	'width of dialog boxes
+'   nfiles%:=FileList(name$,0);	                         're-count .smr files
+'   st%:=nfiles%-nexcluded%;
+'   nd%:=nfiles%-1;
+'   
+'   DlgCreate("Enter Creation date",0,10);
+'   DlgAllow(511);
+'   DlgText("The creation dates of the following files is undefined.\n"+
+'   "Enter creation dates manually to include these files. Undated files will be ignored",2,1);
+'   DlgText(" Hr           Min         Sec          Day   /    Month  /    Year",25,3);
+'   DlgGroup("",1,3.4,72,nexcluded%+0.9);
+'   j%:=4;
+'   for i%:=st% to nd% do
+'      DlgText(Print$("%d: %s",j%-2,flist$[i%]),2,j%);	 'filenames
+'      j%+=1;
+'   next;	
+'   itmm%:=1;		
+'   for k%:=0 to 5	do	
+'      j%:=4;			
+'      for i%:=st% to nd% do
+'         if k%<>4 then
+'            DlgInteger(itmm%,width[k%],lo[k%],hi[k%],xpos,j%,1);	'hour:min:sec / day / month / yr
+'         else
+'            DlgList(itmm%,width[k%],month$[],13,xpos,j%);	
+'         endif;
+'         itmm%+=1;
+'         j%+=1;
+'      next;
+'      xpos+=ofs;			
+'   next;		
+'   ok%:=DlgShow(td%[2][st%:],td%[1][st%:],td%[0][st%:],td%[3][st%:],td%[4][st%:],td%[5][st%:]);	'h:m:s:day/month/yr	
+'   if ok%=0 then return 1; endif;	                   'cancelled
+'   
+'	for i%:=st% to nd% do
+'		if td%[3][i%]> 0 and td%[4][i%] >0 then	          'if day and month were set then assume that the entire date is valid
+'			FileOpen(flist$[i%],0,0);	                         'open files in order
+'			FileTimeDateSet(td%[][i%]);	                      'set creation dates 
+'			FileClose();
+'		else
+'			ignore%+=1;
+'			ArrConst(td%[][i%],0);	                            'reset time/date to zero, i.e. undated
+'		endif;
+'	next;
+'	if ignore%>0 then
+'		Newsflash(Print$("Warning| %d files with invalid creation dates will be ignored",ignore%),3.0,0,10,0);
+'	endif;
+'	ArrSort(td%[5][],1,flist$[],td%[4][],td%[3][],td%[2][],td%[1][],td%[0][],MaxT[]);	're-sort filenames in descending order of year of creation.
+'	
+'	nexcluded%:=0;
+'	j%:=nfiles%-1;	                                     'files with no creation date will sort to the end (yr changes to 2000 by default)
+'	while td%[5][j%]=0 do
+'		flist$[j%]:="";	                                  'delete filename from list of files to concatenate
+'		j%-=1;	                                           'decrement the count.
+'	wend;
+'	nfiles%:=j%+1;	                                     'updated number of files to process
+'endif;
+'----------------------------------------------------------------------------------------------
+'convert creation dates to seconds since 1st Jan of the year in which the oldest file was created
+yr0%:=Min(td%[5][:nfiles%]);	                      'exclude undated
+yr0%:=td%[5][yr0%];	                                  'get earliest year of creation
+'convert dates to seconds since midnight on Jan 1st of earliest year in list	
+var  s%,m%,h%,d%,mth%,y%;	
+for i%:=0 to nfiles%-1 do
+	s%:=td%[0][i%];	                                  'sec
+	m%:=td%[1][i%]*60;	                               'min
+	h%:=td%[2][i%]*3600;	                               'hr
+	d%:=(td%[3][i%]-1)*spd%;	                         'day
+	if td%[4][i%]= 1 then	                            'if January then no previous months
+		mth%:=0;
+	else
+		mth%:=ArrSum(dim%[:td%[4][i%]-1])*spd%;	       'number of days in previous months * sec per day
+	endif;
+	y%:=spy%*(td%[5][i%]-yr0%);	                      'yr
+	sec%[i%]:=y%+mth%+d%+h%+m%+s%;	                   'total in Seconds
+	j%:=yr0%;
+	repeat	                                           'correct for leap years between first and last created files
+		if j% mod 4 = 0 and (td%[5][i%]> j% or td%[4][i%]>2) then	'if year is divisible by 4 and file is dated March of that year or later then 
+			sec%[i%]+=spd%;	                            'add a day for each leap year between oldest and newest files
+		endif;
+		j%+=1;
+	until j%> td%[5][i%];		
+next;
+ArrSort(sec%[:nfiles%],0,flist$[:nfiles%],MaxT[:nfiles%]);	'sort files in ascending order of creation date
+ok%:=BatchFileMerge%(flist$[:nfiles%],MaxT[:nfiles%],nchans%,spec$,mode%,gap);	'merge batch of files
+return 1;
+end;
+
+func CheckCompatibility%(srcvh%,srcch%,destvh%,destch%);	'check compatibility of source and destination arrays
+'srcvh%: view handle of source
+'srcch%: source channel number
+'destvh%: view handle of destination file
+'destch%: destination channel number
+'returns 0: destination is unused channel in a new file;
+'     >0 channel number of destination
+'-1: no match (event v waveform or vv)
+
+var skind%,dkind%,matchflg%;
+
+dkind%:=View(destvh%).ChanKind(destch%);
+skind%:=View(srcvh%).ChanKind(srcch%);
+
+docase
+case dkind%=0 then	       'unused dest chan in a new destination file
+	matchflg%:=-1;
+case (dkind%=1 or dkind%=9) and not (skind%=1 or skind%=9) then	'dest is waveform or realwave and source is not
+	matchflg%:=-1;
+case (dkind%<>1 and dkind%<>9) and (skind%=1 or skind%=9) then	'dest is event/marker and source is a waveform
+	matchflg%:=-1;
+else
+	matchflg%:=destch%;	                               'destoption%=0: new channels are automatically compatible with source
+endcase;
+return matchflg%;
+end;
+
+func CommonIdl%()	                                     'cope with user changing show/hide or selected state of channels whiole a dialog is open
+var n%,lst%[2],flg%;
+
+docase
+case InStr(LCase$(DlgValue$(2)),"selected")>0 then	    'source data: selected channels
+	n%:=View(vlst%[DlgValue(1)+1]).ChanSelect(-1);	    'count selected channels
+	var list%[n%+1];	                                  'make array to hold selected channels
+	ChanList(list%,65536+8192+16384+2097152);	          'list of selected permanent channels
+	
+	if list%[0]<>lastsel% or ArrSum(list%[])<> lastselsum% then
+		View(vlst%[DlgValue(1)+1]).ChanList(list%,65536+8192+16384+2097152);
+		flg%:=2;
+		lastsel%:=list%[0];
+		lastselsum%:=ArrSum(list%[]);
+	endif;
+	
+case InStr(LCase$(DlgValue$(2)),"visible")>0 then 
+	n%:=View(vlst%[DlgValue(1)+1]).ChanList(lst%,2048+8192+16384+2097152);	'list of visible permanent channels
+	var vislist%[n%+1];
+	View(vlst%[DlgValue(1)+1]).ChanList(vislist%[],2048+8192+16384+2097152);
+	if vislist%[0]<>lastvis% or ArrSum(vislist%[])<> lastvissum% then
+		View(vlst%[DlgValue(1)+1]).ChanList(vislist%,2048+8192+16384+2097152);
+		flg%:=2;
+		lastvis%:=vislist%[0];
+		lastvissum%:=ArrSum(vislist%[]);
+	endif;
+	
+case InStr(LCase$(DlgValue$(2)),"all")>0 then
+	n%:=View(vlst%[DlgValue(1)+1]).ChanList(lst%,8192+16384+2097152);	'all permanent channels
+	if n% <> lastn% then
+		flg%:=2;
+		lastn%:=n%;
+	endif;
+endcase;
+return flg%;
+end;
+
+func CopyViaMBuffer%(srcvh%,srcch%,stsrc,ndsrc,destvh%,destch%,stdest,nddest);	'indirect copy/paste via a memory buffer when inserting events/markers 
+'srcvh%: source view handle
+'srcch%: source channel
+'stsrc: start time in source
+'ndsrc: end time in source
+'destvh%: destination view handle
+'destch%: destination channel
+'stdest: start time in destination
+'nddest: end time in destination
+
+var ch%,mch%,t,ok%,dm%;
+var flags%,binsz,dotsz%;
+
+View(destvh%);
+dm%:=DrawMode(destch%);	                               'get drawing mode of the destination channel
+dotsz%:=DrawMode(destch%,-2);
+binsz:=DrawMode(destch%,-3);
+flags%:=DrawMode(destch%,-15);
+
+t:=Min(nddest,MaxTime());
+var k,sz,pre,trace,np%;
+k:=ChanKind(destch%);
+docase 'create a memory buffer copy of destination channel
+case k=1 or k=9 then 'waveform or Realwave
+   mch%:=MemChan(k,0,BinSize(destch%));
+   ChanScale(mch%, ChanScale(destch%));    'Copy scale
+   ChanOffset(mch%, ChanOffset(destch%));  'offset
+   ChanUnits$(mch%, ChanUnits$(destch%));  'and units
+   
+case k>1 and k<=5 then'event/marker
+   mch%:=MemChan(k);
+   
+case k=6 then 'WaveMark 
+   np%:=MarkInfo(destch%,pre,trace);
+   mch%:=MemChan(k,np%,BinSize(destch%),pre,trace);
+   ChanScale(mch%, ChanScale(destch%));    'Copy scale
+   ChanOffset(mch%, ChanOffset(destch%));  'offset
+   ChanUnits$(mch%, ChanUnits$(destch%));  'and units   
+   
+case k=7 or k=8 then 'RealMark/TextMark
+   np%:=MarkInfo(destch%);
+   mch%:=MemChan(k,np%);
+endcase;
+
+ChanTitle$(mch%,ChanTitle$( destch%));              'Set our own title
+ChanComment$(mch%,ChanComment$(destch%));
+
+ChanSave(destch%,mch%,destvh%,0,MaxTime());
+docase
+case dm%=1 or dm%=2 or dm%=7 or dm%=8 or dm%=12 or dm%=14 then	'apply dotsz%
+	DrawMode(mch%,dm%,dotsz%);
+case dm%=5 or dm%=6 or dm%=11 then	                   'apply binsz
+	DrawMode(mch%,dm%,binsz);
+case dm%=15 then
+	DrawMode(mch%,dm%,flags%)	                         'apply flags%
+endcase;
+MemDeleteTime(mch%,3,stdest,t);	                      'delete data to be overwritten
+View(srcvh%);
+ok%:=ChanSave(srcch%,mch%,destvh%,stsrc,ndsrc,stdest);	'replace with data from source file
+if ok%=mch% then	                                     'successfully updated the memory buffer
+	View(destvh%);
+	ChanDelete(destch%);	                               'delete disk based old version
+	ch%:=ChanSave(mch%,destch%,destvh%,0.0,MaxTime());	 'replace with updated version
+	if ch%=destch% then	                               'saved successfully
+		ChanDelete(mch%);	                               'delete the buffer
+		'ChanShow(destch%);
+	endif;
+endif;
+return ch%;
+end;
+
+func DeleteRange%()
+var ntv%,lst%[2],ok%,i%;
+var tchk%[2];	                                        'check boxes to force time range to start and end of file
+var st,et,dtime;	                                     'start and end of gap and start time for pasting
+var nch%,chkind%;
+var gap,gap$:="No change";
+var mfmode%;	                                        'mode of marker filter on current channel
+var options$[2],optndx%;
+Profile("Splice","delgap","No change",gap$);
+Profile("Splice","gapoptndx",1,optndx%);
+ntv%:=ViewList(lst%[],1);	                            'count of open time views
+var vlst$[ntv%];	                                     'array for view titles
+var tvndx%;	                                           'index into view list
+
+options$[0]:=" Baseline"; options$[1]:=" No baseline";
+
+ViewList(vlst%[],1);	                                  'fill array
+for i%:=1 to vlst%[0] do
+	vlst$[i%-1]:=View(vlst%[i%]).WindowTitle$();	       'create array of view titles	
+next;
+DlgCreate("Delete time range",70,10);
+DlgAllow(503,DelRngeIdl%,DelRngeChnge%);
+DlgList(1,"Target view",vlst$[],ntv%);
+DlgText("Channels to delete|Enter a channel specification,e.g. 1,3..5,7 or choose an option from the list",2,2);
+DlgString(2,15,12 ,"0-9,.-abcdeilst",27,2,"    |All|Visible|Selected");	'channels to copy
+DlgText("Start time|Tip: Drag cursor 1 or click on the checkbox to select zero.",2,3);
+DlgText("End time|Tip: Drag cursor 2 or click on the checkbox to select MaxTime().",2,4);
+DlgReal(3,12,0.0,1e30,30,3,1);	                      'stime
+DlgReal(4,12,0.0,1e30,30,4,1);	                      'etime
+DlgCheck(5,"",26,3);	                                  'stime ->0.0
+DlgCheck(6,"",26,4);	                                  'etime -> MaxTime()
+DlgText("Gap between sections",2,5);
+DlgString(7,15,12,"aceghnopN0-9. ",27,5,"No change|No gap|1s|0.1s");
+DlgGroup("Waveform channels only",2,6.25,40,1.8);
+DlgText("Options",4,7.1);
+DlgList(8,14,options$[],4,27,7.1);
+itm%[0]:=3; itm%[1]:=4;
+ok%:=DlgShow(tvndx%,chspec$,st,et,tchk%[],gap$,optndx%);
+if not ok% then return 1; endif;	                      'cancelled
+
+Profile("Splice","delgap",gap$);	                      'save waveform delete options for next time
+Profile("Splice","gapoptndx",optndx%);
+docase
+case et<st then
+	var flip;
+	flip:=st; st:=et; et:=flip;	                      'flip start and end if they were swapped over
+case st=et then 
+	Newsflash("Error|Invalid time range",0,0,10,0);
+	return 1;
+endcase;
+docase
+case InStr(gap$,"No change")>0 then gap:=-1;	          'convert gap$ to a number
+case InStr(gap$,"No gap")>0 then gap:=0;
+else
+	gap:=Val(gap$);	                                  'else extract gap duration from string
+endcase;
+
+tvndx%+=1;	                                           '[0] is the number of channels in list
+View(vlst%[tvndx%]);
+ChanList(lst%,128);	                                  'get a spare channel to act as a buffer
+if lst%[0]=0 then
+	Message("Error|Cannot delete time ranges. No free channels.");
+	return 1;
+endif;
+
+ArrConst(specarr%[],0);
+nch%:=ArrayfromSpec%(vlst%[tvndx%],chspec$,specarr%[]);	'convert source channel specifier to an array of channels (specarr%[])
+if nch%>0 then
+	var mask%[256][4];	                               'array for storing the marker filter of a channel before deleting
+	
+	docase
+	case gap = 0.0 then 
+		dtime:=st;	                                     'set start of paste to start of deletion
+	case gap > 0.0 then	                         
+		dtime:=st+gap;	                                  'set start of paste to user defined time after start of deletion
+	else	                                        
+		dtime:=et;	                                     'start paste at end of deletion
+	endcase;	
+	
+	for i%:=1 to specarr%[0] do
+		chkind%:=ChanKind(specarr%[i%]);	                'get channel kind
+		docase
+		case chkind% >= 5 and chkind% < 9 then	          'marker channels
+			'we delete visible markers in the selected time range while preserving hidden ones
+			'if gaps are closed then all markers in the region of overlap will be deleted.
+			mfmode%:=MarkMask(specarr%[i%],-1);	          'get marker filter mode
+			MarkMask(specarr%[i%],mask%[][]);	          'save marker filter settings
+			MarkMask(specarr%[i%],mfmode%);	             'set mode
+			MarkMask(specarr%[i%],-1, 1,-1);	             'include everything (reset)
+			ChanSave(specarr%[i%],lst%[1],0,0.0,st,0.0);	 'copy all codes in range before the deletion
+			MarkMask(lst%[1],mfmode%);	                   'set mode again before next save 
+			ChanSave(specarr%[i%],lst%[1],0,et,MaxTime(),dtime);	'and after the deletion
+			if dtime-st > 0 then	                         'there is a gap between end of rnge 1 and start of rnge 2
+				MarkMask(specarr%[i%],mask%[][],1);	       'restore original marker filter
+				MarkMask(specarr%[i%],mfmode%);		
+				MarkMask(specarr%[i%],0,-1,-1);	          'invert mask, i.e. show what was hidden and vice versa
+				ChanSave(specarr%[i%],lst%[1],0,st,dtime,st);	'copy previously hidden codes from the time range
+			endif;
+			
+		case (chkind%>=1 and chkind% <=4) or chkind%=9 then	'Waveform/Realwave or Event/Level
+			ok%:=ChanSave(specarr%[i%],lst%[1],0,0.0,st,0.0);	'copy from zero to start of time range to buffer
+			if ok%<0 then Message("Error|failed to process channel %d",specarr%[i%]); return 1; endif;	'failed
+			if (chkind%=1 or chkind%=9) and optndx%=0 then	'fill gap with baseline if required
+				DoBaseline%(lst%[1],st,dtime);
+			endif;			
+			ok%:=ChanSave(specarr%[i%],lst%[1],0,et,MaxTime(),dtime);	'copy range: end of gap to end of file to buffer
+			if ok%<0 then Message("Error|failed to process channel %d",specarr%[i%]); return 1; endif;	'failed
+		endcase;
+		ChanDelete(specarr%[i%]);	                      'delete the original data
+		ok%:=ChanSave(lst%[1],specarr%[i%],0,0.0,MaxTime());	'replace with edited copy
+		ChanDelete(lst%[1]);	                            'clear the buffer
+		if chkind% >= 5 and chkind% < 9 then 
+			MarkMask(specarr%[i%],mask%[][],1);	          'restore original marker filter
+			MarkMask(specarr%[i%],mfmode%);			
+		endif;		
+		ChanShow(specarr%[i%]);	                         'show results		
+	next;
+else
+	Newsflash("The channel specification was empty. No channels deleted",2,0,10,1);
+endif;
+return 1;
+end;
+
+func DelRngeChnge%(item%)	                            'react to changes in the Delete Range dialog
+var vh%,nch%,onoff%;
+var cpos;
+
+vh%:=vlst%[DlgValue(1)+1];
+docase
+case item%<=1 then
+	ArrConst(en%,1);
+	FrontView(vh%);
+	DoCursors(2);
+	
+case item%=5 then	                                     'toggle <start> cursor between 0.0s and mid-screen when checkbox clicked
+	DoCursors(2);	                                     'cope if user deleted cursors that we need while the dialog is open
+	if DlgValue(3)=0.0 then
+		cpos:=View(vh%).XLow()+0.3*(View(vh%).XHigh() - View(vh%).XLow());
+		DlgValue(3,cpos);
+	else
+		DlgValue(3,0.0);
+	endif;	
+	DlgValue(5,0);	                                     'uncheck the box
+	LinkDlgToCsr%(3,itm%[0],1,vh%);	                   'link times in dialog to cursor in source file
+	
+case item%=6 then	                                     'toggle <end> cursor between 0.0s and mid-screen when checkbox clicked
+	DoCursors(2);
+	if DlgValue(4)>View(vh%).MaxTime()-0.01 then
+		cpos:=View(vh%).XLow()+0.6*(View(vh%).XHigh() - View(vh%).XLow());
+		DlgValue(4,cpos);	
+	else
+		DlgValue(4,View(vh%).MaxTime());
+	endif;	
+	DlgValue(6,0);	                                     'uncheck the box
+	LinkDlgToCsr%(4,itm%[1],2,vh%);	                   'link times in dialog to cursor in source file
+endcase;
+
+if InStr(LCase$(DlgValue$(7)),"no gap")>0 then	       'disable baseline setting if there is no gap$
+	DlgValue(8,1);	                                     'force to <no baseline>
+	DlgEnable(0,8);
+else
+	DlgEnable(1,8);
+endif;
+
+if item%=0 or item% =2 then
+	nch%:=ArrayfromSpec%(vh%,DlgValue$(2),specarr%[]);	 'check whether source view contains some channels
+	if nch%=0 then	                                     'and generate chan spec string if necessary
+		en%[0]:=0;
+	else
+		en%[0]:=1;
+	endif;
+endif;
+
+if ArrSum(en%[:2])=2 then
+	onoff%:=on% else onoff%:=off%; endif;
+DlgEnable(onoff%,-1);	                               'enable OK button if settings are valid
+
+LinkDlgToCsr%(item%,itm%[0],1,vh%);	                   'link times in dialog to cursor in source file
+LinkDlgToCsr%(item%,itm%[1],2,vh%);
+return 1;
+end;
+
+func DelRngeIdl%()	                                  'idle routine of the delete ranges dialog  links cursors to the dialog
+var flg%;
+
+flg%:=CommonIdl%();	                                  'check whether visible/selected status of channels changed while the dialog was open
+if flg%>0 then
+	DelRngeChnge%(2);	                                  'if so then force dialog to update
+endif;
+if ViewKind(vlst%[DlgValue(1)+1])=0 then
+	LinkCsrToDlg(itm%[0],1,vlst%[DlgValue(1)+1]);	    'link cursors 1 and 2 in source file to the dialog
+	LinkCsrToDlg(itm%[1],2,vlst%[DlgValue(1)+1]);
+endif;
+return 1;
+end;
+
+func DoBaseline%(ch%,s,e)	                            'add section of baseline at zero to a channel
+'ch% add the baseline to this channel in the current view
+'s,e start and end of time range for baseline
+
+var rsz%:=10000;
+var arr[rsz%];	                                        'array to hold baseline
+var i%,pts%,nbfr%,rem%;
+
+ArrConst(arr[],0.0);
+s:=LastTime(ch%,s)+BinSize(ch%);	                      'get the exact start/end times so that the baseline is joined to adjacent data points
+if s<0 then s:=0.0; endif;	                            'cope if the deletion begins at time zero
+pts%:=1+(e-s)/BinSize(ch%);	                         'nr. of sample points needed to fill the gap (+1 to ensure link to data at the end
+nbfr%:=pts%/rsz%;	                                     'number of complete buffers
+rem%:=pts% mod rsz%;	                                  '+ partial buffer
+pts%:=ChanWriteWave(ch%,arr[:rem%],s);	                'write partial buffer
+for i%:=1 to nbfr% do	                               'followed by complete buffers as required until all done
+	s+=pts%/BinSize(ch%);	                            'update start time
+	ChanWriteWave(ch%,arr[],s);					
+next;
+return 1;
+end;
+
+proc DoCursors(nc%)	                                  'set up one or two static cursors in time view
+var i%,n%,num%;
+
+n%:=nc%+1;
+CursorVisible(0,0);	                                  'hide cursor zero
+repeat
+	num%:=CursorDelete(n%);
+	if num%>0 then n%+=1; endif;	                      'delete cursors 3 to 9	
+until num%=0 or n%=9;
+
+for i%:=1 to nc% do
+	if CursorExists(i%) then
+		CursorActive(i%,0);	                            'force static mode
+		CursorVisible(i%,1);	                            'make sure we can see cursors
+	else
+		CursorNew(XLow()+((XHigh()-XLow())*i%/3.0),i%);		
+	endif;
+next;
+CursorRenumber();
+CursorLabel(4,1,"start (%.2ps)");	                    	
+CursorLabelPos(1,2);
+if nc%=2 then
+	CursorLabel(4,2,"end (%.2ps)");
+	CursorLabelPos(2,4);
+endif;
+return;
+end;
+
+proc DoToolbar();
+ToolbarClear();
+ToolbarSet(0,"",idle%);
+ToolbarSet(quitbtn%,"&Quit||Quit the script",Quit%);
+ToolbarSet(TVSplicebtn%,"&Copy/Paste||Customised copy and paste",TVSplice%);
+ToolbarSet(batchbtn%,"&Batch Process||Merge all the time views in a folder",BatchProcess%);
+ToolbarSet(delbtn%,"&Delete||Delete data in selected time range",DeleteRange%);
+Toolbar("Cut, Copy, Paste and Merge data in Spike2 time views",511);
+return;
+end;
+
+proc HrMinSec(t,&hr%,&mins%,&s%)	                      't in sec returned in hr:min:sec format
+hr%:=0; mins%:=0; s%:=0;
+s%:=t mod 60.0;
+mins%:=t/60.0;
+if mins% > 59 then
+	hr%:=mins%/60;
+	mins%:=mins% mod 60;
+endif;
+return;
+end;
+
+func idle%()
+var lst%[2];
+var en%;
+
+if ViewList(lst%,1)=0 then	                            'no time views open
+	en%:=0;
+else
+	en%:=1;
+endif;
+ToolbarEnable(TVSplicebtn%,en%);
+ToolbarEnable(delbtn%,en%);
+return 1;
+end;
+
+func Makecspc$(chspec%[])	                            'Convert a channel specification array to string format
+'chspec%[]: a channel specification
+'returns an equivalent channel specification string
+var cspc$,i%,lasti%,done%;
+var copy%[chspec%[0]];	                               'copy of input array
+ArrConst(copy%,chspec%[1:]);
+ArrDiff(copy%);	                                     'array of gaps between channel numbers (element 0, the number of channels is excluded)
+lasti%:=0;
+i%:=1;
+repeat
+	cspc$+=Print$("%d",chspec%[i%]);	                   'add channel number at the start of a sequence
+	if i%<chspec%[0] then	                            'if not the end of the array
+		done%:=0;
+		while not done% do	                            'find next non consecutive channel number of sequence
+			if copy%[i%]=1 then	                         'consecutive
+				i%+=1;	                                  'so, go to next channel
+			else
+				done%:=1;	                               'end search: found non consective chan nr.
+			endif;			
+			if i%=Len(copy%[]) then	                      'reached end of list
+				done%:=1;	                               'end search 
+			endif;						
+		wend;
+		docase
+		case i%-lasti%>2 then	                         'if of two or more chans are consecutive
+			cspc$+=Print$("..%d",chspec%[i%]);	          'use .. construction
+		case i%-lasti%>1 then			
+			cspc$+=Print$(",%d",chspec%[i%]);	          'use a comma for consecutive pair
+		endcase;
+		if i%<chspec%[0] then	                         'add a comma unless this is the last item in the list
+			cspc$+=Print$(",");
+		endif;
+		lasti%:=i%;	                                     'do next chan nr
+		i%+=1;		
+	else
+		i%+=1;	                                        'end of list; flag jump out of repeat loop
+	endif;
+until i%>Len(copy%[]);
+return cspc$;
+end;
+
+func MakeDestArray%(srcvh%,srcarr%[],destvh%,destoption%,destarr%[],newflag%);	'make array of channels in destination where the source chans will be pasted
+'srcvh%	source view handle
+'srcarr%[]	array of source channels
+'destvh%	destination view handle
+'destoption%	0: New channel; 1: match channel nr; 2: match channel title
+'destarr%[]	an array of channels in the destination file to which the source channels i srcarr%[] will be copied
+'newflag% 0; copying to a new file;1:copying to an existing data file.
+'returns -1 if an incompatibility between source and destination was found or 1 if no problem was detected.
+
+var i%,ret%:=1,ch%;
+var srcttl$;
+var lst%[2];
+
+ArrConst(destarr%[],0);	                               'clear destination array 
+docase
+case destoption%=0 then
+	destarr%[0]:=specarr%[0];	                         'just store the number of channels, destination channel numbers will be added as they are copied
+	
+case destoption%=1 and newflag%=0 then	
+	ArrConst(destarr%[],srcarr%[:srcarr%[0]+1]);	       'copy matched chan numbers from source to dest arrays when copying to a new file
+	
+case destoption%=1 then	                               'match channel numbers in source and pre-existing dest file
+	ArrConst(destarr%[],srcarr%[:srcarr%[0]+1]);	       'copy source chan numbers to destarr%
+	repeat
+		i%+=1;
+		ch%:=CheckCompatibility%(srcvh%,srcarr%[i%],destvh%,destarr%[i%]);
+		if ch% <0 then
+			ret%:=MisMatchFound%(srcvh%,srcarr%[i%],destvh%,destarr%[i%],stopflag%);	'ret%= 1: write to a new channel; ret%= -1: Stop copying data
+			destarr%[i%]:=0;	                            'set up copy to a new channel in dest.
+		endif;
+	until i%=srcarr%[0] or ret%<0;	                   'until all done or abort flag set
+	
+case destoption%=2 and newflag%=0 then
+	ArrConst(destarr%[],srcarr%[:srcarr%[0]+1]);	       'copy matched chan numbers from source to dest arrays when copying to a new file
+	
+case destoption%=2 then	                               'match channel titles 
+	'create the array of channel numbers in the the destination file
+	var nch%,j%,match%,ttldest$;
+	View(destvh%);
+	nch%:=ChanList(lst%);	                            'list all channels in destvh%
+	var dallch%[nch%+1];
+	ChanList(dallch%[]);	                               'array of all channels in destination
+	repeat
+		i%+=1;
+		match%:=0;
+		j%:=0;
+		srcttl$:=View(srcvh%).ChanTitle$(srcarr%[i%]);	 'get title of next source channel
+		repeat
+			j%+=1;	                                     'increment source channel counter
+			ttldest$:=ChanTitle$(dallch%[j%]); 
+			if srcttl$=ttldest$ then	                   'found a matching title
+				ch%:=CheckCompatibility%(srcvh%,srcarr%[i%],destvh%,dallch%[j%]);	'returns destch if these channels compatible, 0: new, -1 if no match.
+				if ch%>=0 then
+					destarr%[i%]:=ch%;	                   'add matching chan nr to dest array
+					destarr%[0]+=1;	                      'increment counter
+					match%:=1;	                            'flag it. Note that destarr%[i%] will be 0 if no match was found
+				endif;
+			endif;
+		until j%=dallch%[0] or match%=1;	                'until match found or all channels searched
+		if j%=dallch%[0] and match%=0 then	             'if no matching channel found then warn user
+			ret%:=MisMatchFound%(srcvh%,srcarr%[i%],destvh%,destarr%[i%],stopflag%);	'ret%= 1: write to a new channel; ret%= -1: Stop copying data
+		endif;
+	until i%=srcarr%[0] or ret%<0;
+endcase;
+return ret%;
+end;
+
+func MisMatchFound%(srcvh%,srcch%,destvh%,destch%,stopflag%)	'warning messages and option to abort if mismatched channels detected
+var wttl$,skind%,sttl$,ok%,vh%;
+var typ$[10];
+typ$[0]:="None"; typ$[1]:="Waveform"; typ$[2]:="Event-"; typ$[3]:="Event+"; typ$[4]:="Level"; 
+typ$[5]:="Marker"; typ$[6]:="WaveMark"; typ$[7]:="RealMark"; typ$[8]:="TextMark"; typ$[9]:="Realwave";
+
+vh%:= View();
+View(srcvh%);
+wttl$:=WindowTitle$();
+skind%:=ChanKind(srcch%);
+sttl$:=ChanTitle$(srcch%);
+View(vh%);
+if stopflag% then
+	ok%:=MyQuery%(Print$("Incompatible channel\n Source: %s <#%d %s> (%s).",UCase$(wttl$),srcch%,sttl$,typ$[skind%]),"Create New Channel","Stop",0,10);
+	if not ok% then
+		Yield(0.1);
+		return -1;	                                     'flag abort
+	endif;
+else
+	Newsflash(Print$("Incompatible channel|%s No match found for: %s <#%d %s> (%s).\n Data will be added to an new channel in destination.",
+	spacer$,UCase$(wttl$),srcch%,View(srcvh%).ChanTitle$(srcch%),typ$[skind%]),3,0,10,1);	
+endif;
+destarr%[0]+=1;	                                     'increment the count of destination chans so that the new channel will be shown by ChanShow()
+return 1;
+end;
+
+func MyQuery%(text$,yes$,no$,x,y);	                   'customised query box with user-defined x/y coordinates
+var ok%;
+DlgCreate("Query",x,y);
+DlgText(text$,2,1);
+DlgButton(1,yes$);
+DlgButton(0,no$);
+ok%:=DlgShow();
+return ok%;
+end;
+
+func Quit%()
+View(LogHandle());
+WindowVisible(0);	                                     'hide log
+EditSelectAll();	                                     'clear log
+EditClear();
+return 0;	                                           'close script
+end;
+
+func TVSplice%()	                                     'customised copy/paste for open time views
+var lst%[2],i%,ok%,aok%;
+var stsrc,ndsrc,stdest,dest$[3],nchans%;	             'dlgShow() arguements
+var tchk%[2];	                                        'check boxes to force time range to start and end of file
+var srcvh%,destvh%;	                                  'view handles
+var overwriteflg%;
+var gap:=1.0;	                                        'gap between copied data sections in a waveform channel
+var mtmkch%;	                                        'memory buffer for textmarks
+var oldtmkch%;	                                        'pre-existing disk-based textmark channel holding file merge information
+var wttl$;
+
+stopflag%:=1;	                                        'give the option to abort when source and nominal destination chans are incompatible
+View(LogHandle()).WindowVisible(0);	                   'hide log
+dest$[0]:="New"; dest$[1]:="Match channel nr."; dest$[2]:="Match channel title";
+repeat
+	nvws%:=ViewList(vlst%[],1);	                      'list of open time views
+	nvws%+=1;
+	var vlst$[nvws%];	                                  'arrays to hold view titles + one spare slot at the end
+	vlst%[0]+=1;	                                     'add one to the list so we get a slot in the dialog for <New Output> file
+	for i%:=0 to nvws%-2 do
+		View(vlst%[i%+1]);
+		vlst$[i%]:=WindowTitle$();	                      'load view titles into array
+	next;
+	vlst$[nvws%-1]:="New";
+	docase
+	case newflag%=0 or vlst%[0]=1 then
+		destndx%:=nvws%-1;	                            'default to <New> output file if first pass or only one time view open
+	case  ViewKind(vlst%[destndx%+1])=0 then	          'previous destination file is open
+		wttl$:=View(vlst%[destndx%+1]).WindowTitle$();	 'get its current title (it may be a newly named file)
+		i%:=0;
+		while vlst$[i%] <> wttl$ do	                   'find title in the view list
+			i%+=1;
+		wend;
+		destndx%:=i%;	                                  'use as the default destination
+	endcase;
+	aok%:=1;	                                           're-open dialog if OK pressed but errors were detected
+	ArrConst(specarr%,0);	
+	DlgCreate("Copy/Paste time view data",70,10);
+	DlgAllow(511-8,TVSpliceIdl%,TVSpliceChnge%);
+	DlgGroup("Source",1,1,42,6);
+	DlgText("View",2,2);
+	DlgList(1,33,vlst$[],vlst%[0]-1,9,2);
+	DlgString(2,"Channels to copy|Enter a channel specification,e.g. 1,3..5,7 or choose an option from the list",12 ,"0-9,.-",28,3,"    |All|Visible|Selected");	'channels to copy
+	DlgText("Start time|Tip: Drag cursor 1 or click on the checkbox to select zero.",2,4);
+	DlgText("End time|Tip: Drag cursor 2 or click on the checkbox to select MaxTime().",2,5);
+	DlgReal(3,12,0.0,1e30,30,4,1);
+	DlgReal(4,12,0.0,1e20,30,5,1);
+	DlgText("Duration",2,6);
+	DlgGroup("",16,5.7,26,1.1);
+	ditm%[5]:=DlgText("",17,6.1,24);
+	
+	DlgGroup("Destination",1,7.5,42,8);
+	DlgText(" View",2,8.5);
+	DlgList(5,33,vlst$[],vlst%[0],9,8.5);
+	DlgText("Channels",2,9.5);
+	DlgList(6,25,dest$[],3,17,9.5);
+	DlgText("Insert at time",2,10.5);
+	DlgString(7,11,12,"a-zA-Z0-9.()",31,10.5,"MaxTime()|Cursor(1)|0.0");
+	ditm%[1]:=DlgText("Free channels",2,11.5);
+	DlgInteger(8,8,0,400,34,11.5,1);
+	
+	DlgText("Gap between sections (s)",2,12.5);
+	DlgReal(9,7,0,1.0,35,12.5,0.1);	
+	ditm%[3]:=DlgText("Max. duration",2,13.5);
+	DlgGroup("",16,13.2,26,1.1);
+	ditm%[0]:=DlgText("",17,13.6,24);	                'Maximum file duration
+	
+	ditm%[2]:=DlgText("Time remaining",2,14.5);
+	DlgGroup("",16,14.2,26,1.1);
+	ditm%[4]:=DlgText("",17,14.6,24);	                'Time available
+	
+	itm%[0]:=3; itm%[1]:=4; itm%[2]:=7;	                'item number of times to be linked to cursor positions
+	DlgCheck(10,"",26,4);
+	DlgCheck(11,"",26,5);	
+	DlgButton(2,"Align Cursor||Click here to align cursor with an Event or Marker",AlignCursorBtn%,16,10.5);	'button to align cursor 1 with a trigger
+	ok%:=DlgShow(srcndx%,chspec$,stsrc,ndsrc,destndx%,destoption%,stdest$,nchans%,gap,tchk%[]);	
+	if not ok% then return 1; endif;	                   'cancelled: return to toolbar
+	
+	Yield(1.0);	                                        'allow time for the screen to update 
+	srcvh%:=vlst%[srcndx%+1];	                         'concise variable names for view handles
+	destvh%:=vlst%[destndx%+1];
+   
+   if srcvh%=destvh% then
+      Newsflash("Error|Source and destination must be different files.",4,0,0,1);
+      return 1;
+   endif;   
+	
+	if destvh%=0 then	                                  'create new destination file if selected
+		var upt;
+		upt:=View(srcvh%).BinSize()*1e6;
+		destvh%:=FileNew(7,0,upt,1,1,nchans%);	          'new output file compatible with source
+	endif;
+	
+	docase	                                           'Check for valid start times end times
+	case InStr(LCase$(stdest$),"cursor(1)")>0 then
+		stdest:=View(destvh%).Cursor(1);
+	case InStr(LCase$(stdest$),"maxtime()")>0 then
+		stdest:=View(destvh%).MaxTime();
+		aok%:=1
+	else
+		stdest:=Val(stdest$);
+	endcase;
+	if aok% =1 then
+		ok%:=MakeDestArray%(srcvh%,specarr%[],destvh%,destoption%,destarr%[],1);	'create array of destination channels
+		if ok%=1 then
+			var tcopy;
+			tcopy:=stdest+ndsrc-stsrc;
+			if TMax < tcopy then	                         'if calculated end time of dest file exceeds the upper limit
+				HrMinSec(tcopy-Tmax,hr%,mins%,sec%);
+				Newsflash(Print$("Selection is %dh:%dm:%ds too long for the free space in destination file",hr%,mins%,sec%),5,0,10,1);
+				aok%:=0;
+			endif;
+		endif;
+	endif;	
+until aok%=1 or ok%<0;
+if ok%<>1 then 
+	Newsflash("Cancelled|No channels were copied or pasted.",2.5,0,10,1);	'abort was pressed
+	return 1;
+endif;
+
+'No obvious errors so proceed...
+View(srcvh%).Window(0,0,100,50);	                      'set source above and destination below
+View(destvh%).Window(0,50,100,100);
+
+'create memory buffer copy of textmark channel
+View(destvh%);
+var nch%;
+
+mtmkch%:=MemChan(8,80);	                            'new memory channel for textmarks
+ChanTitle$(mtmkch%,"mergeinfo");
+ArrConst(lst%[],0);
+nch%:=FChanList%(lst%,32+8192+16384,"mergeinfo",0);
+if nch%=1 then
+	oldtmkch%:=lst%[1];
+	MemImport(mtmkch%,oldtmkch%,0.0,MaxTime());	       'copy previous textmarks to memory buffer	
+endif;
+ChanShow(mtmkch%);
+
+'create a channel specification in place of <all> or <selected>
+if InStr(LCase$(chspec$),"sel")>0 or InStr(LCase$(chspec$),"all")>0 or InStr(LCase$(chspec$),"vis")>0 then
+	chspec$:=Makecspc$(specarr%[]);
+endif;
+
+'check whether existing data will be overwritten
+View(destvh%);
+i%:=0;
+repeat
+	i%+=1;
+	if destarr%[i%] > 0 then
+		if MaxTime(destarr%[i%])>stdest then
+			overwriteflg%:=1;
+		endif;
+	endif;		
+until overwriteflg% or i%=specarr%[0];
+if overwriteflg% then
+	aok%:=MyQuery%(Print$("Some data in %s will be overwritten if you use these settings.",vlst$[destndx%]),"Continue","Cancel",0,10);
+	if aok%=0 then
+		ChanDelete(mtmkch%);
+		Newsflash("Cancelled|No channels were copied or pasted.",2.5,0,10,1);	'abort was pressed
+		return 1;
+	endif;
+endif;
+
+'Merge files
+var ch%,kind%,tlast;
+var xt;
+xt:=stdest+ndsrc-stsrc;	                               'calculated end time of dest file when this data is added
+for i%:=1 to specarr%[0] do
+	ToolbarText(Print$("Copying %s channel: %d",View(srcvh%).WindowTitle$(),specarr%[i%]));
+	View(destvh%);
+	kind%:=ChanKind(destarr%[i%]);	                   'check whether we are about to append to or overwrite an existing channel
+	if destarr%[i%]>0 then 
+		tlast:=LastTime(destarr%[i%],MaxTime()+1);	    'tlast: last event/sample in the channel
+	else
+		tlast:=0.0;
+	endif;
+	docase
+	case kind%=0 then	                                  'save data to an unused channel
+		View(srcvh%);
+		ch%:=ChanSave(specarr%[i%],destarr%[i%],destvh%,stsrc,ndsrc,stdest+gap);	'use memory buffer if overwriting events/markers or adding waveform at
+		
+	case (kind%=1 or kind%=9) and stdest>=View(destvh%).NextTime(destarr%[i%],-1) then	'use chansave for waveforms and realwaves unless...
+		View(srcvh%);	                                  'pasting in before first data points in the existing channel
+		ch%:=ChanSave(specarr%[i%],destarr%[i%],destvh%,stsrc,ndsrc,stdest+gap);	'use chanSave unless overwriting events/markers
+		
+	case (kind%>1 and kind%< 9) and stdest > tlast then	'appending data to non-waveform channels
+		View(srcvh%);
+		ch%:=ChanSave(specarr%[i%],destarr%[i%],destvh%,stsrc,ndsrc,stdest+gap);	'use chanSave unless overwriting events/markers
+	else	                                              'start of a file
+		ch%:=CopyViaMBuffer%(srcvh%,specarr%[i%],stsrc,ndsrc,destvh%,destarr%[i%],stdest,xt);
+	endcase;			
+	if ch%<0 or ch% >=399 then
+		ChanDelete(mtmkch%);
+		Message("A problem arose while trying to copy %s",View(srcvh%).ChanTitle$(specarr%[i%]));
+		return 1;
+	endif;			
+	View(destvh%).ChanShow(ch%);
+next;	
+ToolbarText("");
+View(destvh%);
+AddMergeInfo%(mtmkch%,srcvh%,stdest+gap,stsrc,ndsrc,chspec$,destoption%);
+
+'maintain constant width of display while showing the pasted data
+var xl,xh,xrnge;
+xrnge:=XHigh()-XLow();	                               'range of destination
+docase
+case FileName$()="" then	                            'if copying to new file (not yet saved to disk) then base the x range on the source file
+	xl:=View(srcvh%).XLow();
+	xh:=View(srcvh%).XHigh();
+case stdest >= XLow() and xt <= XHigh() then	          'paste is within currently displayed range: no change
+	xl:=XLow(); xh:=XHigh();
+case stdest>=XHigh() then
+	xl:=xt-xrnge; xh:=xt;	                            'show the end of pasted section
+case stdest <=XLow() then
+	xl:=stdest; xh:=stdest+xrnge;	                      'show beginning of pasted section
+endcase
+XRange(xl,xh);
+WindowVisible(1);
+
+'save textmark buffer to disk channel
+View(destvh%);
+if ChanKind(oldtmkch%)=8 then
+	ChanDelete(oldtmkch%);	                            'delete old info channel -if there was one
+	ch%:=ChanSave(mtmkch%,oldtmkch%,destvh%);	          'save updated textmarks to same channel as before
+else
+	ch%:=ChanSave(mtmkch%,0,destvh%);	                'else save to next available channel
+endif;
+ChanDelete(mtmkch%);	                                  'delete memory channel
+ChanShow(ch%);
+
+if vlst$[destndx%]="New" then	                         'save newly created file so that it appears in the view lists next time
+	View(destvh%);
+	ok%:=FileSaveAs("",-1);
+	if ok%<0 then
+		FileClose(0,-1);	                               'delete if not saved
+	endif;
+endif;
+
+ToolbarText("");
+return 1;
+end;
+
+func TVSpliceChnge%(item%)	                            'react to changes made by user in the TVSplice dialog
+var lst%[2],onoff%;
+var nch%;
+var bsz;	                                              'upt of destination file (used to measure maximum allowed file duration)
+var Tleft;
+var cpos;
+
+docase
+case item%<=1 then
+	ArrConst(en%[],1);	                               'ok button will default to ON unless an enable flag gets set to zero
+	t:=View(vlst%[DlgValue(1)+1]).MaxTime();	          'set default time range
+	DlgValue(4,t);
+	View(vlst%[DlgValue(1)+1]).DoCursors(2);
+	if ViewKind(vlst%[DlgValue(5)+1])=0 then	          'existing dest file selected
+		nch%:=View(vlst%[DlgValue(5)+1]).ChanList(lst%,128);
+		DlgValue(8,nch%);	                               'show number of channels left
+		DlgEnable(0,8);	                               'and disable item
+		DlgEnable(1,7);	                               'enable destination time with a blank entry
+		DlgValue$(7,"");
+		DlgEnable(1,6);	                               'enable chan kind selector
+	else	                                              'new dest selected
+		DlgValue(8,399);	                               'set to maximum allowed and 
+		DlgEnable(1,8);	                               'enable number of channels items
+		DlgValue$(7,"0.0");	                            'force start time for a new file to zero
+		en%[3]:=1;	                                     'flag that the start time is valid
+		if DlgValue(6)=2 then DlgValue(6,1); endif;	    'don t allow match to title for new destination
+	endif;
+case item%=3 then
+	if DlgValue(3)<0.0 or DlgValue(3) >= DlgValue(4) or DlgValue(3) > t then en%[0]:=0; endif;	'don t allow times outside the limits of the file
+case item%=4 then
+	if DlgValue(4)<0.0 or DlgValue(4) <= DlgValue(3) or DlgValue(4) > t then en%[0]:=0; endif;
+case item%=5 then
+	if ViewKind(vlst%[DlgValue(5)+1])=0 then	          'if destination view exists, i.e., not a new view as yet uncreated...
+		View(vlst%[DlgValue(5)+1]).DoCursors(1);	       'make sure that we have one cursor in destination view
+		nch%:=View(vlst%[DlgValue(5)+1]).ChanList(lst%,128);
+		DlgValue(8,nch%);	                               'show remaining free channels
+		DlgEnable(0,8);	                               'disable number of channels items
+		DlgEnable(1,7);	                               'enable destination time with a blank entry
+		DlgEnable(1,6);	                               'enable chan kind selector
+		DlgValue$(7,"");
+		newflag%:=1;	                                  'flag that destination file exists and contains some data
+	else
+		newflag%:=0;	                                  'reset number of sections pasted into this data file
+		DlgValue(8,256);	                               'New file set nchans to maximum allowed,
+		DlgEnable(1,8);	                               'enable number of channels items
+		DlgValue$(ditm%[0],"");	                         'clear time available info
+		DlgValue$(ditm%[4],"");
+		DlgValue$(7,"0.0");	                            'force start time for a new file to zero
+		DlgEnable(0,7);	                               'and lock it
+		if DlgValue(6)=2 then
+			Newsflash("Cannot match channel titles when the destination is a new file. Setting was changed to match Channel nrs.",2.5,0,10,1);
+			DlgValue(6,1);
+		endif;	                                        'don t allow match to title for new destination
+	endif;
+case item%=6 then
+	docase
+	case DlgValue(6)=0 then
+		DlgValue$(7,"MaxTime()");	                      'default to start of file for New channels
+	case DlgValue(6)=2 and ViewKind(vlst%[DlgValue(5)+1])<> 0 then
+		Newsflash("Cannot match channel titles when the destination is a new file. Setting was changed to match Channel nrs.",2.5,0,10,1);
+		DlgValue(6,1);	                                  'don t allow match to title for new destination file
+	else
+		var td;
+		td:=View(vlst%[DlgValue(5)+1]).MaxTime();	       'default to MaxTime() when appending channels
+		DlgValue(7,td);
+	endcase;
+	
+case item%=10 then	                                  'toggle <start> cursor between 0.0s and mid-screen when checkbox clicked
+   DoCursors(2); 'don t let user get away with deleting the cursors that we need
+	if DlgValue(3)=0.0 then
+		cpos:=View(vlst%[DlgValue(1)+1]).XLow()+0.3*(View(vlst%[DlgValue(1)+1]).XHigh() - View(vlst%[DlgValue(1)+1]).XLow());
+		DlgValue(3,cpos);
+	else
+		DlgValue(3,0.0);
+	endif;
+	DlgValue(10,0);	                                  'uncheck the box
+	LinkDlgToCsr%(3,3,1,vlst%[DlgValue(1)+1]);	       'link times in dialog to cursor in source file
+	
+case item%=11 then
+   DoCursors(2);
+	if DlgValue(4)>View(vlst%[DlgValue(1)+1]).MaxTime()-.01 then	'toggle <end> cursor between 0.0s and mid-screen when checkbox clicked
+		cpos:=View(vlst%[DlgValue(1)+1]).XLow()+0.6*(View(vlst%[DlgValue(1)+1]).XHigh() - View(vlst%[DlgValue(1)+1]).XLow());
+		DlgValue(4,cpos);	
+	else
+		DlgValue(4,View(vlst%[DlgValue(1)+1]).MaxTime());
+	endif;
+	DlgValue(11,0);	                                  'uncheck the box
+	LinkDlgToCsr%(4,4,2,vlst%[DlgValue(1)+1]);	       'link times in dialog to cursor in source file
+endcase;
+
+var x,nn%,tst$;
+x:=Val(DlgValue$(7));	                               'try to extract start time in destination from string
+tst$:=DlgValue$(7);
+nn%:=InStr(LCase$(DlgValue$(7)),"cursor(1)");
+if nn%>0 and ViewKind(vlst%[DlgValue(5)+1])=0 then
+	View(vlst%[DlgValue(5)+1]).DoCursors(1);	          'if cursor is selected make sure that we have one
+	DlgVisible(1,-2);	                                  'show <Align Cursor> button
+else
+	DlgVisible(0,-2);	                                  'show <Align Cursor> button
+endif;
+
+if InStr(LCase$(DlgValue$(7)),"cursor(1)")>0 or InStr(LCase$(DlgValue$(7)),"maxtime()")>0 or (x>=0.0 and Len(DlgValue$(7))>0) then
+	'enable OK if set to cursors(1) or MaxTime() or a number but disable if blank
+	en%[3]:=1;
+else
+	en%[3]:=0;
+endif;
+
+if item% <=2 then
+	nch%:=ArrayfromSpec%(vlst%[DlgValue(1)+1],DlgValue$(2),specarr%[]);	'check whether source view contains some channels
+	if nch%=0 then	                                     'and generate chan spec string if necessary
+		en%[1]:=0;
+	else en%[1]:=1;
+	endif;
+endif;
+
+if DlgValue(8)=0 then en%[2]:=0; else en%[2]:=1; endif;	'enable flag for number of channels available in destination
+if DlgValue(6)=0 then
+	DlgValue(9,0.0);
+	DlgEnable(0,9);	                                  'disable gap between sections item when writing to new channels
+else
+	DlgEnable(1,9);	                                  'enable gaps with 1s default
+	DlgValue(9,0.0);
+endif;
+
+var vh%,v%;
+v%:=DlgValue(5);
+if ViewKind(vlst%[DlgValue(5)+1])=0 then	             'if destination is a named time view
+	vh%:=vlst%[DlgValue(5)+1];
+else
+	vh%:=vlst%[DlgValue(1)+1];	                         'New destination selected so...
+endif;
+View(vh%);
+bsz:=BinSize();	                                     'get binsize
+
+Tmax:=(Pow(2,31)-1)*bsz;	                            'max duration (s) of dest file
+HrMinSec(Tmax,hr%,mins%,sec%);
+DlgValue$(ditm%[0],Print$("%.1fs   ( %dh:%dm:%ds )",Tmax,hr%,mins%,sec%));
+
+var mt;	                                              'calculate time left
+if vh%=vlst%[DlgValue(1)+1] then
+	mt:=0.0;	                                           'copying to new file
+else
+	mt:=MaxTime();	                                     'copying to existing file
+endif;
+Tleft:=Tmax-mt;
+HrMinSec(Tleft,hr%,mins%,sec%);
+DlgValue$(ditm%[4],Print$("%.1fs   ( %dh:%dm:%ds )",Tleft,hr%,mins%,sec%));
+
+if ArrSum(en%) < Len(en%) then onoff%:=off% else onoff%:=on%; endif;
+DlgEnable(onoff%,-1);	                               'en/dis-able OK depending on validity of user selections
+
+LinkDlgToCsr%(item%,itm%[0],1,vlst%[DlgValue(1)+1]);	 'link times in dialog to cursor in source file
+LinkDlgToCsr%(item%,itm%[1],2,vlst%[DlgValue(1)+1]);
+return 1;
+end;
+
+func TVSpliceIdl%()	                                  'idle for TVSplice dialog
+var tdur,flg%;
+
+if ViewKind(vlst%[DlgValue(1)+1])=0 then
+	LinkCsrToDlg(itm%[0],1,vlst%[DlgValue(1)+1]);	    'link cursors 1 and 2 in source file to the dialog
+	LinkCsrToDlg(itm%[1],2,vlst%[DlgValue(1)+1]);
+	tdur:=DlgValue(4)-DlgValue(3);
+	if tdur<>lasttdur then	                            'update duration of selection item in dialog if necessary
+		HrMinSec(tdur,hr%,mins%,sec%);
+		DlgValue$(ditm%[5],Print$("%.1fs   ( %dh:%dm:%ds )",tdur,hr%,mins%,sec%));
+	endif;
+	flg%:=CommonIdl%();	                               'check whether visible/selected status of channels changed while the dialog was open
+	if flg%>0 then
+		TVSpliceChnge%(2);	                            'if so, force dialog to update
+	endif;
+endif;
+return 1;
+end;
+
+Proc HideApps();	                                     'Hide unnecessary toolbars etc. while script is running.
+var i%;
+View(App(3)).WindowVisible(1);	                      'normalise script view before hiding (may reappear if maximised)
+gFloat%[0] := App(-2);	                               'number of windows
+for i% := 1 to gFloat%[0] do	                         'hide all windows and save state
+	gFloat%[i%] := View(App(i%)).WindowVisible(0);
+next;
+return;
+end;
+
+Proc RestoreApps();	                                  'Restore toolbars etc. to former glory
+var i%;
+
+for i%:=1 to gFloat%[0] do
+	docase
+	case i%=3 then
+		View(App(3)).Windowvisible(0);	                'keep script invisible
+	else
+		View(App(i%));	                                  'restore other items to previous state
+		WindowVisible(gFloat%[i%]);
+	endcase;
+next;
+return;
+end;
+
+proc NewsFlash(msg$,Tshow,x,y,beep%);	                'floating message box at coordinates with optional audible alert
+'msg$: message to display. If the string contains a vertical bar, preceding text will be used as a title otherwise the title <Info> is used (mod.02/08JGP)
+'Tshow: close the dialog automatically after Tshow seconds
+'x,y: coordinates of the top left corner of the dialog box
+'beep%: set as 1 to play a system asterisk sound when the box opens. Set 0 for no warning sound.
+'This procedure works in conjunction with  func NFIdle%();
+
+var dummy;
+if Tshow < 1.5 then Tshow:=1.5; endif;	                'set minimum display time
+tflash:=Tshow;	                                        'tflash is a global variable
+if beep% then
+	Sound("S*",1);	                                     'beep
+endif;
+Seconds(0);	                                           'reset the clock
+dummy := InStr(msg$,"|",1);	                         'check for | char
+if dummy then                          
+	DlgCreate(Left$(msg$,dummy-1),x,y);	                'split title and message
+	msg$:= DelStr$(msg$,1,dummy);       
+else
+	DlgCreate("Info",x,y);	                            'else use default title
+endif;
+DlgLabel(1,msg$);
+DlgAllow(1023,NFIdle%);	                               'Idle routine does the timing
+DlgButton(0,"");	                                     'hide cancel button
+DlgShow(dummy);
+return;
+end;
+
+func NFidle%();	                                     'Newsflash idle routine
+var ret%:=1;
+if Seconds() > tflash then	                            'times up 
+	ret%:= 0;	                                        'so close message box
+endif;
+return ret%;
+end;
+
+func FChanList%(&chlst%[],types%,inttl$,cs%)	          'list of channels in the current view that fit the type and title specification
+'chlst%[]:  list of channels fitting the specification is returned in this array
+'types:     mask of channel types to return, e.g. 1+2+1024.
+'inttl$:    include channels containing this string in the title
+'cs%:     1: case sensitive; not 1: case insensitive search
+'returns the number of channels fitting the specification or -1 if the view was of wrong type
+
+var i%,ln%,a$,b$,k%,ret%;
+var list%[400];
+
+k%:=ViewKind();
+if k% = 0 or k% =4 or k% = 12 then	                   'if current view is ok (time, result or xy view) 
+	ChanList(list%[],types%);	                         'get channels of selected type
+	if list%[0] = 0 then
+		ret%:=0;	                                        'no channels of type found
+	else
+		ln%:=Len(chlst%[]);	                            'get size of array for storing the results
+		i%:=1;	                                        'initialise counter
+		repeat	                                        'search the list for channels that fits the title specification
+			if cs% = 1 then
+				a$:=ChanTitle$(list%[i%]);
+				b$:=inttl$;	                               'case sensitive
+			else
+				a$:=LCase$(ChanTitle$(list%[i%]));
+				b$:=LCase$(inttl$);	                      'insensitive
+			endif;
+			if Instr(a$,b$) > 0 then	                   'channel title contains search string
+				chlst%[0]+=1;	                            'increment element 0
+				chlst%[chlst%[0]]:=list%[i%];	             'add to list of channels 
+			endif;        
+			i%+=1;	                                     'increment counter
+		until chlst%[0] = ln%-1 or i% > list%[0];	       'until output array chlst%[] is full or all channels of type% were checked
+		ret%:=chlst%[0];	                               'return number of channels that meet the spec.
+	endif;
+else
+	ret%:=-1;	                                        'error wrong view type
+endif;
+return ret%;
+end;
+
+func LinkDlgToCsr%(item%,ditm%,csr%,timevh%)	          'move cursor to match time set in dialog
+'This function links a DlgReal() item for an x-coordinate to a cursor position so that the cursor jumps to the new position
+'when the dialog item is updated. The function must be called in the Change function of the dialog.
+
+'Arguements:
+'item%:	the dialog item that is currently being updated
+'ditm%:	the dialog item to link to a cursor position
+'csr%:	the number of the cursor to link to the dialog item. The cursor must already exist.
+'timevh%:	the handle of the view containing the cursor
+var vh%;
+vh%:=View();	                                        'remember current view
+if ViewKind(timevh%) = 0 then
+   View(timevh%);
+	if item% =ditm% then	              	
+      Cursor(csr%,DlgValue(ditm%));	                   'move cursor to new position
+	endif;
+   lastC[csr%]:=-1;	                                  'force idle routine to update selection
+endif;
+View(vh%);	                                           'restore previous view
+return 1;
+end;
+
+proc LinkCsrToDlg(ditm%,csr%,timevh%)	                'update dialog item when user drags a cursor
+'This procedure links a cursor position to a DlgReal() item so that the dialog item updates when the cursor is dragged.
+'It must be called in the Idle function of the dialog.
+
+'Arguements:
+'ditm%:	the dialog item to link to a cursor position
+'csr%:	the number of the cursor to link to the dialog item. The cursor must already exist.
+'timevh%:	the handle of the view containing the cursor
+
+var vh%;
+vh%:=View();	                                        'remember current view
+if ViewKind(timevh%)= 0 then
+   View(timevh%);
+   if Cursor(csr%) <> lastC[csr%] then	                'if cursor moved since last time we looked...
+      DlgValue(ditm%,Cursor(csr%));	                   'update dialog to match
+      lastC[csr%]:=Cursor(csr%);	                      'remember current position
+   endif;
+endif;
+View(vh%);	                                           'restore previous view
+return;
+end;

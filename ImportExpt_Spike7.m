@@ -40,10 +40,9 @@ nsweeps = size(sweeps_trig,1);
 % getting continuous data in .wc field
 a = exist('Spikes');
 if a ~= 0
-    spikedata = Spikes.values;
     
-    SweepsMat = MakeSweeps(spikedata.values',sweeps_trig,sweeps_samps);
-    expt.wc.Vm = SweepsMat;
+    SweepsMat = MakeSweeps(Spikes.values',sweeps_trig,sweeps_samps);
+    expt.wc.Spikes = SweepsMat;
 end
 
 SweepsMat = MakeSweeps(lowgain.values',sweeps_trig,sweeps_samps);
@@ -52,8 +51,11 @@ expt.wc.Vm = SweepsMat;
 SweepsMat = MakeSweeps(command.values',sweeps_trig,sweeps_samps);
 expt.wc.command = SweepsMat;
 
-SweepsMat = MakeSweeps(dac0.values',sweeps_trig,sweeps_samps);
-expt.wc.dac0 = SweepsMat;
+a = exist('dac0');
+if a ~= 0
+    SweepsMat = MakeSweeps(dac0.values',sweeps_trig,sweeps_samps);
+    expt.wc.dac0 = SweepsMat;
+end
 
 %%%%%%%%%%%%%%%%%%
 % gathering sweeps info
@@ -69,19 +71,19 @@ expt.sweeps.time = t;
 % for each sweep, determine if a cmd trig or internal trigger
 cmdtrig = zeros(nsweeps,1);
 clocktrig = zeros(nsweeps,1);
-jitter = 0.001/expt.meta.dt ; %in samples
+jitter = 0.002/expt.meta.dt ; %in samples
 for itrig = 1:nsweeps
-   ind = sweeps_trig(itrig); 
-   win = [ind - jitter : ind + jitter];
-   cmdwin = CmdTrig.values(win);
-   
-   if ~isempty(find(cmdwin)) % if there was a cmd event in this window then this was a cmd trig
-       cmdtrig(itrig) = 1;
-   end
-   
-   if isempty(find(cmdwin)) % if there was a cmd event in this window then this was a cmd trig
-       clocktrig(itrig) = 1;
-   end
+    ind = sweeps_trig(itrig);
+    win = [max([ind - jitter, 1]) : ind + jitter];
+    cmdwin = CmdTrig.values(win);
+    
+    if ~isempty(find(cmdwin)) % if there was a cmd event in this window then this was a cmd trig
+        cmdtrig(itrig) = 1;
+    end
+    
+    if isempty(find(cmdwin)) % if there was a cmd event in this window then this was a cmd trig
+        clocktrig(itrig) = 1;
+    end
 end
 expt.sweeps.cmdtrig = cmdtrig;
 expt.sweeps.clocktrig = clocktrig;
@@ -96,7 +98,7 @@ for isweep = 1:nsweeps
     
     if ~isempty(trigind) %if there is a stim on this sweep
         trigind = trigind(1);
-        latency(isweep,1) = trigind * expt.meta.dt;
+        latency(isweep,1) = trigind / expt.meta.rate;
     end
     
     if isempty(trigind) %if there was no stim then latency = nan
@@ -105,23 +107,26 @@ for isweep = 1:nsweeps
 end
 expt.sweeps.latency = latency;
 
-% position = position of object at time of stimulus artifact
-dac0_mat = MakeSweeps(dac0.values',sweeps_trig,sweeps_samps);
-stim_mat = MakeSweeps(ArtTrig.values',sweeps_trig,sweeps_samps);
-for isweep = 1:nsweeps
-   trigind = find(stim_mat(isweep,:));
-   if ~isempty(trigind) %if there is a stim on this sweep
-   trigind = trigind(1);
-   expt.sweeps.position(isweep,1) = dac0_mat(isweep,trigind);
-   end
-   if isempty(trigind) %if there was no stim then position = position at onset of sweep
-       expt.sweeps.position(isweep,1) = dac0_mat(isweep,1);
-   end
+a = exist('dac0');
+if a ~= 0
+    % position = position of object at time of stimulus artifact
+    dac0_mat = MakeSweeps(dac0.values',sweeps_trig,sweeps_samps);
+    stim_mat = MakeSweeps(ArtTrig.values',sweeps_trig,sweeps_samps);
+    for isweep = 1:nsweeps
+        trigind = find(stim_mat(isweep,:));
+        if ~isempty(trigind) %if there is a stim on this sweep
+            trigind = trigind(1);
+            expt.sweeps.position(isweep,1) = dac0_mat(isweep,trigind);
+        end
+        if isempty(trigind) %if there was no stim then position = position at onset of sweep
+            expt.sweeps.position(isweep,1) = dac0_mat(isweep,1);
+        end
+    end
 end
 
 % current = median  holding current during sweep
 SweepsMat = MakeSweeps(current.values',sweeps_trig,sweeps_samps);
-expt.sweeps.current = median(SweepsMat,2);
+expt.sweeps.current = round(median(SweepsMat,2));
 
 %%%%%%%%%%%%%%%%%%%
 %sweeps data that I need to log manually and import from spreadsheet
@@ -131,28 +136,51 @@ expt.sweeps.current = median(SweepsMat,2);
 % end_time;
 % Global;
 % Local;
-[num,txt,raw] = xlsread([exptfoldername(1:end-1) '.xlsx'],1);
-varnames = txt(1,1:size(num,2));
-for ivar = 1:size(varnames,2)
-    s = [varnames{ivar} '= num(:,' num2str(ivar) ');'];
-    eval(s)
+a = exist([exptfoldername(1:end-1) '.xlsx'], 'file')
+if  a ~=0
+    [num,txt,raw] = xlsread([exptfoldername(1:end-1) '.xlsx'],1);
+    varnames = txt(1,1:size(num,2));
+    for ivar = 1:size(varnames,2)
+        s = [varnames{ivar} '= num(:,' num2str(ivar) ');'];
+        eval(s)
+    end
+    windows = [start_time,end_time];
+    
+    % global and local mimic amplitude
+    a = exist('Global');
+    if a ~= 0
+        tmpG = NaN(nsweeps,1);
+        t = expt.sweeps.time;
+        for iwin = 1:size(windows,1)
+            inds = intersect(find(t>=windows(iwin,1)),find(t<=windows(iwin,2)));
+            tmpG(inds) = Global(iwin);
+        end
+        expt.sweeps.global = tmpG;
+        %assume that if exists global then will exist local
+        tmpL = NaN(nsweeps,1);
+        t = expt.sweeps.time;
+        for iwin = 1:size(windows,1)
+            inds = intersect(find(t>=windows(iwin,1)),find(t<=windows(iwin,2)));
+            tmpL(inds) = Local(iwin);
+        end
+        expt.sweeps.local = tmpL;
+    end
+    
+    a = exist('Electrode');
+    if a ~= 0
+        tmpE = NaN(nsweeps,1);
+        t = expt.sweeps.time;
+        for iwin = 1:size(windows,1)
+            inds = intersect(find(t>=windows(iwin,1)),find(t<=windows(iwin,2)));
+            tmpE(inds) = Electrode(iwin);
+        end
+        expt.sweeps.electrode = tmpE;
+    end
 end
-windows = [start_time,end_time];
-
-% global and local mimic amplitude
-tmpG = NaN(nsweeps,1);
-tmpL = NaN(nsweeps,1);
-t = expt.sweeps.time;
-for iwin = 1:size(windows,1)
-    inds = intersect(find(t>=windows(iwin,1)),find(t<=windows(iwin,2)));
-    tmpG(inds) = Global(iwin);
-    tmpL(inds) = Local(iwin);
-end
-expt.sweeps.global = tmpG;
-expt.sweeps.local = tmpL;
 
 %%%%%%%%%%%
 %save expt
 %%%%%%%%%%%
 savename = [exptfoldername(1:end-1) '.mat'];
 save(savename,'expt')
+

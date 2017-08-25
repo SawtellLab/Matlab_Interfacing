@@ -1,0 +1,81 @@
+'Script to subtract events from one channel in another. Good for separating signals of different amplitude
+'in extracellular recordings. Just create different eventchannels from the same waveformchannel by using different
+'levels with the "data rising through level" function.
+'This script will ask you to specify an eventchannel whose events will be substracted from another eventchannel that
+'you are also asked to specify. You also have to set a tolerance. Since events created from waveform channels with
+'different thresholds are slightly offset from each other (with the event created with a higher threshold marked
+'a little later), you should set the tolerance to at least this delay.
+'The result is written to a new eventchannel that you are asked to select and name.
+
+'Dirk Bucher, Feb 2002. 
+
+
+if ViewKind() <> 0 then		'checks if the associated window is a time view...
+   Message("This isn't a time view!");
+	FrontView (App (3));		'brings script to front...
+FileClose (0);				'...and closes it							
+endif
+
+WindowVisible (3);		'sets the time view to the front
+
+var ok%, cur1, cur2, wholefile%;	'sets variable expressions	
+
+if Cursor (2)<Cursor (1) or Cursor (1)=-1 or Cursor (2)=-1 then ' if Cursor (1) and Cursor (2) are not present or not in the right
+																						'order....
+	DlgCreate ("ATTENTION!");			
+	DlgText ("Cursor (1) and (2) not set correctly.",2,1);
+	DlgLabel	(1, "Analyse whole file?",2,2);								'...choose if you want to analyse the whole file
+	ok%:=DlgShow (wholefile%);
+
+	if ok%=1 then																	'sets analysis to whole file or...
+		cur1:= 0;														
+		cur2:=MaxTime ();
+	else
+FrontView (App (3));		'brings script to front...
+FileClose (0);				'...and closes it															'stops the script
+	endif
+
+else
+	cur1 := Cursor(1);															'if present and in the right order, get cursor times	
+	cur2 := Cursor(2);
+endif
+
+var input%, output%, range, subtr%, name$;
+
+		cur1:= 0;														
+		cur2:=MaxTime ();
+
+DlgCreate ("Eliminate events");		'creates a dialog to assign channels 
+DlgChan (1,"Subtract:", 2);
+DlgChan (2,"from:", 2);
+DlgReal (3, "tolerance [s]", 0,100);
+DlgChan (4, "Output channel:",128);
+DlgString (5, "Name of new channel", 20);
+name$:= "new name...";
+range:= 0.005;
+ok%:= DlgShow (subtr%, input%, range, output%, name$);
+
+var dummychan%;
+
+dummychan%:= MemChan(2); 'new buffer channel is created
+
+MemImport(dummychan%, input%, cur1, cur2);
+
+var nlrg%,i%, lrgspk[100000];
+
+nlrg%:=ChanData(subtr%,lrgspk[],cur1,cur2);
+
+for i% := 0 to nlrg%-1 step 1 do
+MemDeleteTime(dummychan%,0,lrgspk[i%],range);
+next;
+
+
+MemSave(dummychan%,output%, 0, 0);	'saves buffer channel to a real channel
+	ChanDelete(dummychan%, 0);				'deletes the buffer channel
+	ChanShow(output%);				'shows new channel
+	ChanTitle$(output%,name$);		'names new channel
+	DrawMode(output%,2);				'sets channel draw mode to "lines"
+
+'FrontView (App (3));		'brings script to front...
+'FileClose (0);				'...and closes it
+

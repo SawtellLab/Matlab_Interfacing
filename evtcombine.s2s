@@ -1,0 +1,44 @@
+var v698%;
+v698%:=View();
+FrontView(v698%);
+
+var chsave%;  'channel to save combined event channels to
+chsave% := MemChan(3); 'Add new Event+ channel
+
+var chan1%:=402; 'range 1
+var start1:=0;
+var finish1:=MaxTime();
+
+var chan2%:=405;
+var start2:=0;
+var finish2:=MaxTime();
+'
+'var chan3%:=402;
+'var start3:=0;
+'var finish3:=MaxTime();
+'
+'var chan4%:=12;
+'var start4:=0;
+'var finish4:=0;
+
+
+''create chan
+var mem%;
+mem%:=MemChan(Chankind(chan1%));
+ChanShow(mem%); 
+
+MemImport(mem%,chan1%,start1,finish1);
+MemImport(mem%,chan2%,start2,finish2);
+'MemImport(mem%,chan3%,start3,finish3);
+'MemImport(401,chan4%,start4,finish4);
+'ChanNew(chsave%,3); 'Add new Event+ channel
+
+
+MemSave(mem%,chsave%,3,1);
+ChanSelect(mem%,0);
+ChanSelect(chsave%,1);
+ChanTitle$(chsave%, "ArtTrig");
+ChanShow(chsave%);
+
+'ChanDelete(mem%,0);
+
