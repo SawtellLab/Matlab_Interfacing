@@ -15,7 +15,6 @@ ChanShow(chcmd%); 'Make it visible
 MemImport(chcmd%, 2, 0, MaxTime(),3,0.004,HCursor(1));
 ChanTitle$(chcmd%, "cmdtmp");
 
-
 charttmp% := MemChan(3); 'Add new Event+ channel
 ChanShow(charttmp%); 'Make it visible
 MemImport(charttmp%, 2, 0, MaxTime(),3,0.004,HCursor(2));
@@ -32,5 +31,5 @@ ChanShow(5); 'make sure current channel is showing
 var chspikes%; 'MemChan created channel
 chspikes% := MemChan(3); 'Add new Event+ channel
 ChanShow(chspikes%); 'Make it visible
-MemImport(chspikes%, 4, 0.0, MaxTime(),0,0.001,5);
+MemImport(chspikes%, 4, 0.0, MaxTime(),0,0.001,15);
 ChanTitle$(chspikes%, "spkstmp");

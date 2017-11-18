@@ -1,4 +1,4 @@
-function expt = ImportExpt_Spike7(exptdir,exptfoldername,sweeps_dur)
+function expt = ImportExpt_Spike7(exptdir,exptfoldername,sweeps_dur,dosave)
 %requires github.com/SawtellLab/Matlab_Functions to be in Matlab path
 %sweeps_dur = 0.16;
 % exptdir = 'C:\Users\kperks\spikedata\matdata\';
@@ -51,10 +51,19 @@ expt.wc.Vm = SweepsMat;
 SweepsMat = MakeSweeps(command.values',sweeps_trig,sweeps_samps);
 expt.wc.command = SweepsMat;
 
+SweepsMat = MakeSweeps(CmdTrig.values',sweeps_trig,sweeps_samps);
+expt.wc.CmdTrig = SweepsMat;
+
 a = exist('dac0');
 if a ~= 0
     SweepsMat = MakeSweeps(dac0.values',sweeps_trig,sweeps_samps);
     expt.wc.dac0 = SweepsMat;
+end
+
+a = exist('dac1');
+if a ~= 0
+    SweepsMat = MakeSweeps(dac1.values',sweeps_trig,sweeps_samps);
+    expt.wc.dac1 = SweepsMat;
 end
 
 %%%%%%%%%%%%%%%%%%
@@ -81,7 +90,7 @@ for itrig = 1:nsweeps
         cmdtrig(itrig) = 1;
     end
     
-    if isempty(find(cmdwin)) % if there was a cmd event in this window then this was a cmd trig
+    if isempty(find(cmdwin)) % if there was not a cmd event in this window then this was a cmd trig
         clocktrig(itrig) = 1;
     end
 end
@@ -181,6 +190,8 @@ end
 %%%%%%%%%%%
 %save expt
 %%%%%%%%%%%
+if dosave ==1
 savename = [exptfoldername(1:end-1) '.mat'];
 save(savename,'expt')
+end
 

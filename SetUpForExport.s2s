@@ -1,0 +1,116 @@
+var skpheight := 1.5; 'default set to detect peak
+var spkchan% := 4; 
+
+
+if ViewKind() <> 0 then		'checks if the associated window is a time view...
+   Message("This isn't a time view!");
+	FrontView (App (3));		'brings script to front...
+FileClose (0);				'...and closes it							
+endif
+
+WindowVisible (3);		'sets the time view to the front
+
+var ok%, cur1, cur2, wholefile%;	'sets variable expressions	
+
+		cur1:= 0;														
+		cur2:=MaxTime ();
+
+
+CursorNew(XLow()*0.25+XHigh()*0.75, 9);
+CursorLabel(3,9);
+
+HCursorLabel(3,2);
+HCursorLabel(3,1);
+
+var charttmp%; 'MemChan created channel
+var chcmd%; 'MemChan created channel
+
+chcmd% := MemChan(3); 'Add new Event+ channel
+ChanShow(chcmd%); 'Make it visible
+MemImport(chcmd%, 2, 0, MaxTime(),3,0.004,HCursor(1));
+ChanTitle$(chcmd%, "cmdtmp");
+
+charttmp% := MemChan(3); 'Add new Event+ channel
+ChanShow(charttmp%); 'Make it visible
+MemImport(charttmp%, 2, 0, MaxTime(),3,0.004,HCursor(2));
+ChanTitle$(charttmp%, "ArtTrig");
+
+var chArtTrig%; 'MemChan created channel
+chArtTrig% := ChanNew(0,3); 'Add new Event+ channel
+PrintLog(chArtTrig%);
+MemSave(charttmp%,chArtTrig%,3, 1);
+
+ChanShow(chArtTrig%); 'Make sure destination is visible
+ChanShow(5); 'make sure current channel is showing
+
+var chspikes%; 'MemChan created channel
+chspikes% := MemChan(3); 'Add new Event+ channel
+ChanShow(chspikes%); 'Make it visible
+MemImport(chspikes%, spkchan%, 0.0, MaxTime(),0,0.001,skpheight);
+ChanTitle$(chspikes%, "spkstmp");
+
+'Script to subtract events from one channel in another. Good for separating signals of different amplitude
+'in extracellular recordings. Just create different eventchannels from the same waveformchannel by using different
+'levels with the "data rising through level" function.
+'This script will ask you to specify an eventchannel whose events will be substracted from another eventchannel that
+'you are also asked to specify. You also have to set a tolerance. Since events created from waveform channels with
+'different thresholds are slightly offset from each other (with the event created with a higher threshold marked
+'a little later), you should set the tolerance to at least this delay.
+'The result is written to a new eventchannel that you are asked to select and name.
+
+'Dirk Bucher, Feb 2002. 
+
+var name$ ;
+var dummychan%, input%, subtr%, output%; 'MemChan created channel
+var range ;
+var nlrg%,i%;
+
+var lrgspk[100000];
+name$ := "Spikes";
+dummychan%:= MemChan(3); 'new buffer channel is created
+output% := ChanNew(0,3); 'Add new Event+ channel
+input% := chspikes%; 'spikes mem chan created above
+MemImport(dummychan%, input%, cur1, cur2);
+subtr% := chArtTrig%;
+range := 0.002;
+nlrg%:=ChanData(subtr%,lrgspk[],cur1,cur2);
+for i% := 0 to nlrg%-1 step 1 do
+MemDeleteTime(dummychan%,0,lrgspk[i%],range);
+next;
+MemSave(dummychan%,output%, 0, 0);	'saves buffer channel to a real channel
+	ChanDelete(dummychan%, 0);				'deletes the buffer channel
+	ChanShow(output%);				'shows new channel
+	ChanTitle$(output%,name$);		'names new channel
+DrawMode(output%,2);				'sets channel draw mode to "lines"
+
+
+
+var lrgcmd[100000];
+name$ := "CmdTrig";
+dummychan% := MemChan(3); 'new buffer channel is created
+output% := ChanNew(0,3); 'Add new Event+ channel
+input% := chcmd%; 'cmd mem chan created above
+MemImport(dummychan%, input%, cur1, cur2);
+subtr% := chArtTrig%;
+range := 0.002;
+nlrg%:=ChanData(subtr%,lrgcmd[],cur1,cur2);
+for i% := 0 to nlrg%-1 step 1 do
+MemDeleteTime(dummychan%,0,lrgcmd[i%],range);
+next;
+MemSave(dummychan%,output%, 0, 0);	'saves buffer channel to a real channel
+	ChanDelete(dummychan%, 0);				'deletes the buffer channel
+	ChanShow(output%);				'shows new channel
+	ChanTitle$(output%,name$);		'names new channel
+DrawMode(output%,2);				'sets channel draw mode to "lines"
+
+ChanSelect(402, 0);
+ChanSelect(11, 1);
+ChanSelect(10, 1);
+ChanSelect(9, 1);
+ChanSelect(8, 1);
+ChanSelect(5, 1);
+ChanSelect(4, 1);
+ChanSelect(3, 1);
+ChanSelect(2, 1);
+ChanSelect(1, 1);
+

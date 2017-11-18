@@ -20,26 +20,28 @@ WindowVisible (3);		'sets the time view to the front
 
 var ok%, cur1, cur2, wholefile%;	'sets variable expressions	
 
-if Cursor (2)<Cursor (1) or Cursor (1)=-1 or Cursor (2)=-1 then ' if Cursor (1) and Cursor (2) are not present or not in the right
-																						'order....
-	DlgCreate ("ATTENTION!");			
-	DlgText ("Cursor (1) and (2) not set correctly.",2,1);
-	DlgLabel	(1, "Analyse whole file?",2,2);								'...choose if you want to analyse the whole file
-	ok%:=DlgShow (wholefile%);
+'if Cursor (2)<Cursor (1) or Cursor (1)=-1 or Cursor (2)=-1 then ' if Cursor (1) and Cursor (2) are not present or not in the right
+'																						'order....
+'	DlgCreate ("ATTENTION!");			
+'	DlgText ("Cursor (1) and (2) not set correctly.",2,1);
+'	DlgLabel	(1, "Analyse whole file?",2,2);								'...choose if you want to analyse the whole file
+'	ok%:=DlgShow (wholefile%);
+'
+'	if ok%=1 then																	'sets analysis to whole file or...
+'		cur1:= 0;														
+'		cur2:=MaxTime ();
+'	else
+'FrontView (App (3));		'brings script to front...
+'FileClose (0);				'...and closes it															'stops the script
+'	endif
+'
+'else
+'	cur1 := Cursor(1);															'if present and in the right order, get cursor times	
+'	cur2 := Cursor(2);
+'endif
+'
 
-	if ok%=1 then																	'sets analysis to whole file or...
-		cur1:= 0;														
-		cur2:=MaxTime ();
-	else
-FrontView (App (3));		'brings script to front...
-FileClose (0);				'...and closes it															'stops the script
-	endif
-
-else
-	cur1 := Cursor(1);															'if present and in the right order, get cursor times	
-	cur2 := Cursor(2);
-endif
-
+	
 var input%, output%, range, subtr%, name$;
 
 		cur1:= 0;														
